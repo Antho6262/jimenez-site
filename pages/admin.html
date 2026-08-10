@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Administration — Vizu 6Block's</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .tabs { display:flex; gap:0; border-bottom:1px solid var(--border); margin-bottom:24px; }
+    .tab { padding:10px 20px; cursor:pointer; font-size:13px; color:var(--text-muted); border-bottom:2px solid transparent; transition:all .15s; }
+    .tab:hover { color:var(--text); }
+    .tab.active { color:var(--accent); border-bottom-color:var(--accent); font-weight:600; }
+    .tab-content { display:none; }
+    .tab-content.active { display:block; }
+    .section-title { font-size:13px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:.5px; margin-bottom:16px; }
+    .inline-form { display:flex; gap:8px; margin-bottom:16px; }
+    .inline-form input { flex:1; }
+    [title] { cursor:pointer; }
+    .btn-icon { background:transparent; border:1px solid var(--border); border-radius:6px; padding:5px 8px; cursor:pointer; font-size:13px; transition:all .15s; }
+    .btn-icon:hover { border-color:var(--accent); }
+    .btn-icon.danger:hover { border-color:var(--danger); }
+    .cat-header { display:flex; align-items:center; gap:10px; margin-bottom:10px; margin-top:20px; }
+    .cat-header strong { color:var(--accent); font-size:15px; }
+    .prod-add-row { display:flex; gap:8px; margin-bottom:10px; }
+    .prod-add-row input { flex:1; min-width:0; }
+  </style>
+</head>
+<body>
+  <div id="sidebar"></div>
+  <div id="main">
+    <div class="page-header">
+      <div class="page-title">🔧 <span>Administration</span></div>
+    </div>
+
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('semaines',this)">Semaines</div>
+      <div class="tab" onclick="switchTab('membres',this)">Membres</div>
+      <div class="tab" onclick="switchTab('grades',this)">Grades</div>
+      <div class="tab" onclick="switchTab('stock',this)">Stock</div>
+      <div class="tab" onclick="switchTab('actions',this)">Actions dispo</div>
+      <div class="tab" onclick="switchTab('perms',this)">Permissions</div>
+    </div>
+
+    <!-- GRADES -->
+    <div id="tab-grades" class="tab-content">
+      <div class="card">
+        <div class="section-title">Grades</div>
+        <p style="color:var(--text-muted);font-size:12px;margin-bottom:16px">Les grades sont stockés dans Firebase. Le premier de la liste est considéré comme le grade le plus élevé (admin automatique).</p>
+        <div class="inline-form">
+          <input type="text" id="grade-nom" placeholder="Nom du nouveau grade">
+          <button class="btn btn-primary" onclick="addGrade()" title="Ajouter ce grade">+ Ajouter</button>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>Ordre</th><th>Nom du grade</th><th></th></tr></thead>
+            <tbody id="tbody-grades"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- SEMAINES -->
+    <div id="tab-semaines" class="tab-content active">
+      <div class="card">
+        <div class="section-title">Semaines</div>
+        <div class="inline-form">
+          <input type="text" id="sem-nom" placeholder="Nom de la semaine (ex: Semaine 3)">
+          <button class="btn btn-primary" onclick="createSemaine()" title="Créer une nouvelle semaine">+ Créer</button>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>Nom</th><th>Statut</th><th>Actions</th></tr></thead>
+            <tbody id="tbody-semaines"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- MEMBRES -->
+    <div id="tab-membres" class="tab-content">
+      <div class="card">
+        <div class="section-title">Membres</div>
+        <button class="btn btn-primary" style="margin-bottom:16px" onclick="openModalMembre()" title="Ajouter un nouveau membre">+ Ajouter un membre</button>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>Prénom</th><th>Nom</th><th>Grade</th><th>Rôle</th><th>Quota</th><th>Actif</th><th></th></tr></thead>
+            <tbody id="tbody-membres"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- STOCK -->
+    <div id="tab-stock" class="tab-content">
+      <div class="card">
+        <div class="section-title">Catégories & Produits</div>
+        <div class="inline-form">
+          <input type="text" id="cat-nom" placeholder="Nom de la catégorie">
+          <input type="text" id="cat-emoji" placeholder="Emoji" style="width:80px;flex:none">
+          <button class="btn btn-primary" onclick="createCat()" title="Créer une catégorie">+ Catégorie</button>
+        </div>
+        <div id="stock-admin-zone"></div>
+      </div>
+    </div>
+
+    <!-- ACTIONS DISPO -->
+    <div id="tab-actions" class="tab-content">
+      <div class="card">
+        <div class="section-title">Actions disponibles dans le tracker</div>
+        <div class="inline-form">
+          <input type="text" id="action-nom" placeholder="Nom de l'action">
+          <button class="btn btn-primary" onclick="addAction()" title="Ajouter une action">+ Ajouter</button>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>Action</th><th></th></tr></thead>
+            <tbody id="tbody-actions-dispo"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- PERMISSIONS -->
+    <div id="tab-perms" class="tab-content">
+      <div class="card">
+        <div class="section-title">Permissions par grade</div>
+        <div id="perms-zone"></div>
+        <button class="btn btn-primary" style="margin-top:16px" onclick="savePerms()" title="Sauvegarder les permissions">💾 Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal membre -->
+  <div class="modal-overlay" id="modal-membre">
+    <div class="modal">
+      <div class="modal-title" id="modal-membre-title">Ajouter un membre</div>
+      <input type="hidden" id="m-id">
+      <div class="form-grid">
+        <div class="form-group"><label>Prénom</label><input type="text" id="m-prenom"></div>
+        <div class="form-group"><label>Nom</label><input type="text" id="m-nom"></div>
+        <div class="form-group"><label>Grade</label><select id="m-grade"></select></div>
+        <div class="form-group"><label>Rôle</label>
+          <select id="m-role"><option value="membre">Membre</option><option value="admin">Admin</option></select>
+        </div>
+        <div class="form-group"><label>Quota drogue / jour</label><input type="number" id="m-quota" value="0" min="0"></div>
+        <div class="form-group"><label>Mot de passe</label><input type="text" id="m-pwd" placeholder="prenom2026"></div>
+        <div class="form-group">
+          <label>Actif</label>
+          <select id="m-actif"><option value="true">Oui</option><option value="false">Non</option></select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModalMembre()">Annuler</button>
+        <button class="btn btn-primary" onclick="saveMembre()">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal édition produit -->
+  <div class="modal-overlay" id="modal-produit">
+    <div class="modal">
+      <div class="modal-title">✏️ Modifier le produit</div>
+      <input type="hidden" id="ep-catid">
+      <input type="hidden" id="ep-pid">
+      <div class="form-grid">
+        <div class="form-group"><label>Nom du produit</label><input type="text" id="ep-nom"></div>
+        <div class="form-group"><label>Prix ($)</label><input type="number" id="ep-prix" min="0"></div>
+        <div class="form-group"><label>Stock actuel</label><input type="number" id="ep-stock" min="0"></div>
+        <div class="form-group"><label>Seuil alerte</label><input type="number" id="ep-seuil" min="0"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeProduitModal()">Annuler</button>
+        <button class="btn btn-primary" onclick="saveProduit()">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal édition catégorie -->
+  <div class="modal-overlay" id="modal-cat">
+    <div class="modal">
+      <div class="modal-title">✏️ Modifier la catégorie</div>
+      <input type="hidden" id="ec-catid">
+      <div class="form-grid">
+        <div class="form-group"><label>Nom</label><input type="text" id="ec-nom"></div>
+        <div class="form-group"><label>Emoji</label><input type="text" id="ec-emoji"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeCatModal()">Annuler</button>
+        <button class="btn btn-primary" onclick="saveCat()">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal édition grade -->
+  <div class="modal-overlay" id="modal-grade">
+    <div class="modal">
+      <div class="modal-title">✏️ Modifier le grade</div>
+      <input type="hidden" id="eg-index">
+      <div class="form-group"><label>Nom du grade</label><input type="text" id="eg-nom"></div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeGradeModal()">Annuler</button>
+        <button class="btn btn-primary" onclick="saveGrade()">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal édition action -->
+  <div class="modal-overlay" id="modal-action">
+    <div class="modal">
+      <div class="modal-title">✏️ Modifier l'action</div>
+      <input type="hidden" id="ea-id">
+      <div class="form-group"><label>Nom de l'action</label><input type="text" id="ea-nom"></div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeActionModal()">Annuler</button>
+        <button class="btn btn-primary" onclick="saveAction()">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal changement grade membre -->
+  <div class="modal-overlay" id="modal-grade-membre">
+    <div class="modal">
+      <div class="modal-title">🎖️ Changer le grade</div>
+      <input type="hidden" id="gm-id">
+      <div class="form-group">
+        <label id="gm-label">Grade</label>
+        <select id="gm-grade"></select>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="document.getElementById('modal-grade-membre').classList.remove('show')">Annuler</button>
+        <button class="btn btn-primary" onclick="saveGradeMembre()">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal changement mot de passe -->
+  <div class="modal-overlay" id="modal-pwd">
+    <div class="modal">
+      <div class="modal-title">🔑 Changer le mot de passe</div>
+      <input type="hidden" id="pwd-id">
+      <div class="form-group">
+        <label id="pwd-label">Nouveau mot de passe</label>
+        <input type="text" id="pwd-value" placeholder="Nouveau mot de passe">
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="document.getElementById('modal-pwd').classList.remove('show')">Annuler</button>
+        <button class="btn btn-primary" onclick="savePwd()">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal quota drogue -->
+  <div class="modal-overlay" id="modal-quota">
+    <div class="modal">
+      <div class="modal-title">💊 Modifier le quota drogue</div>
+      <input type="hidden" id="quota-id">
+      <div class="form-group">
+        <label id="quota-label">Quota / jour</label>
+        <input type="number" id="quota-value" min="0">
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="document.getElementById('modal-quota').classList.remove('show')">Annuler</button>
+        <button class="btn btn-primary" onclick="saveQuota()">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="../js/firebase-config.js"></script>
+  <script src="../js/app.js"></script>
+  <script>
+    buildSidebar('admin');
+
+    const PAGES_DISPO = ['dashboard','tracker','stats','stock','quotas','objectifs','blanchiment','sanctions','admin','profil','tv','transactions','taxes'];
+
+    GRADES.forEach(g => {
+      document.getElementById('m-grade').innerHTML += `<option value="${g}">${g}</option>`;
+    });
+
+    function switchTab(tab, el) {
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.getElementById('tab-' + tab).classList.add('active');
+      el.classList.add('active');
+      if (tab === 'grades') loadGradesAdmin();
+      if (tab === 'membres') loadMembresAdmin();
+      if (tab === 'stock') loadStockAdmin();
+      if (tab === 'actions') loadActionsAdmin();
+      if (tab === 'perms') loadPerms();
+    }
+
+    // =================== GRADES ===================
+    let gradesLocal = [...GRADES];
+
+    async function loadGradesAdmin() {
+      const snap = await db.ref('grades').once('value');
+      if (snap.exists()) gradesLocal = snap.val();
+      renderGrades();
+    }
+
+    function renderGrades() {
+      document.getElementById('tbody-grades').innerHTML = gradesLocal.length ? gradesLocal.map((g, i) => `<tr>
+        <td style="color:var(--text-muted)">${i + 1}</td>
+        <td><strong>${g}</strong>${i === 0 ? ' <span class="badge badge-accent" style="margin-left:8px">Admin</span>' : ''}</td>
+        <td style="display:flex;gap:6px">
+          ${i > 0 ? `<button class="btn-icon" onclick="moveGrade(${i},-1)" title="Monter ce grade">↑</button>` : '<span style="width:30px;display:inline-block"></span>'}
+          ${i < gradesLocal.length - 1 ? `<button class="btn-icon" onclick="moveGrade(${i},1)" title="Descendre ce grade">↓</button>` : '<span style="width:30px;display:inline-block"></span>'}
+          <button class="btn-icon" onclick="openGradeModal(${i})" title="Modifier le nom de ce grade">✏️</button>
+          <button class="btn-icon danger" onclick="delGrade(${i})" title="Supprimer ce grade">🗑</button>
+        </td>
+      </tr>`).join('') : '<tr><td colspan="3"><div class="empty-state">Aucun grade</div></td></tr>';
+    }
+
+    async function addGrade() {
+      const nom = document.getElementById('grade-nom').value.trim();
+      if (!nom) return;
+      if (gradesLocal.includes(nom)) { Utils.toast('Ce grade existe déjà', 'error'); return; }
+      gradesLocal.push(nom);
+      await saveGradesFirebase();
+      document.getElementById('grade-nom').value = '';
+      renderGrades();
+      Utils.toast('Grade ajouté !');
+    }
+
+    function openGradeModal(index) {
+      document.getElementById('eg-index').value = index;
+      document.getElementById('eg-nom').value = gradesLocal[index];
+      document.getElementById('modal-grade').classList.add('show');
+    }
+
+    async function saveGrade() {
+      const index = parseInt(document.getElementById('eg-index').value);
+      const nom = document.getElementById('eg-nom').value.trim();
+      if (!nom) return;
+      gradesLocal[index] = nom;
+      await saveGradesFirebase();
+      Utils.toast('Grade modifié !');
+      closeGradeModal();
+      renderGrades();
+    }
+
+    async function delGrade(index) {
+      const nom = gradesLocal[index];
+      if (!confirm('Supprimer le grade "' + nom + '" ?')) return;
+      gradesLocal.splice(index, 1);
+      await saveGradesFirebase();
+      Utils.toast('Grade supprimé');
+      renderGrades();
+    }
+
+    async function moveGrade(index, dir) {
+      const newIndex = index + dir;
+      if (newIndex < 0 || newIndex >= gradesLocal.length) return;
+      const tmp = gradesLocal[index];
+      gradesLocal[index] = gradesLocal[newIndex];
+      gradesLocal[newIndex] = tmp;
+      await saveGradesFirebase();
+      renderGrades();
+    }
+
+    async function saveGradesFirebase() {
+      await db.ref('grades').set(gradesLocal);
+    }
+
+    function closeGradeModal() { document.getElementById('modal-grade').classList.remove('show'); }
+
+    // =================== SEMAINES ===================
+    async function loadSemaines() {
+      const snap = await db.ref('semaines').once('value');
+      const list = Object.entries(snap.val() || {}).map(([id, d]) => ({ id, ...d }));
+      list.reverse();
+      document.getElementById('tbody-semaines').innerHTML = list.length ? list.map(s => `<tr>
+        <td>${s.nom}</td>
+        <td><span class="badge ${s.bloquee ? 'badge-danger' : 'badge-success'}">${s.bloquee ? '🔒 Clôturée' : '✅ Active'}</span></td>
+        <td style="display:flex;gap:8px">
+          ${!s.bloquee ? `<button class="btn btn-secondary btn-sm" onclick="cloturerSemaine('${s.id}','${s.nom}')" title="Clôturer cette semaine">🔒 Clôturer</button>` : ''}
+          <button class="btn btn-danger btn-sm" onclick="delSemaine('${s.id}','${s.nom}')" title="Supprimer définitivement cette semaine et ses actions">🗑 Supprimer</button>
+        </td>
+      </tr>`).join('') : '<tr><td colspan="3"><div class="empty-state">Aucune semaine</div></td></tr>';
+    }
+
+    async function createSemaine() {
+      const nom = document.getElementById('sem-nom').value.trim();
+      if (!nom) return;
+      await db.ref('semaines/' + genId()).set({ nom, bloquee: false, createdAt: Date.now() });
+      document.getElementById('sem-nom').value = '';
+      Utils.toast('Semaine créée !');
+      await loadSemaines();
+    }
+
+    async function cloturerSemaine(id, nom) {
+      if (!confirm('Clôturer "' + nom + '" ? Elle ne sera plus modifiable.')) return;
+      await db.ref('semaines/' + id + '/bloquee').set(true);
+      Utils.toast('Semaine clôturée');
+      await loadSemaines();
+    }
+
+    async function delSemaine(id, nom) {
+      if (!confirm('Supprimer "' + nom + '" et toutes ses actions ? Cette action est irréversible.')) return;
+      await db.ref('semaines/' + id).remove();
+      await db.ref('actions/' + id).remove();
+      Utils.toast('Semaine supprimée');
+      await loadSemaines();
+    }
+
+    // =================== MEMBRES ===================
+    async function loadMembresAdmin() {
+      const snap = await db.ref('membres').once('value');
+      const list = Object.entries(snap.val() || {}).map(([id, d]) => ({ id, ...d }));
+      document.getElementById('tbody-membres').innerHTML = list.length ? list.map(m => `<tr>
+        <td>${m.prenom}</td>
+        <td>${m.nom || ''}</td>
+        <td><span class="badge badge-accent">${m.grade}</span></td>
+        <td>${m.role || 'membre'}</td>
+        <td>${m.quota_drogue || 0}</td>
+        <td><span class="badge ${m.actif !== false ? 'badge-success' : 'badge-danger'}">${m.actif !== false ? 'Actif' : 'Inactif'}</span></td>
+        <td style="display:flex;gap:6px">
+          <button class="btn-icon" onclick="editMembre('${m.id}')" title="Modifier ce membre">✏️</button>
+          <button class="btn-icon" onclick="openGradeMembreModal('${m.id}','${m.prenom}','${(m.grade||'').replace(/'/g,"\\'")}')" title="Changer le grade">🎖️</button>
+          <button class="btn-icon" onclick="openPwdModal('${m.id}','${m.prenom}')" title="Changer le mot de passe">🔑</button>
+          <button class="btn-icon" onclick="openQuotaModal('${m.id}','${m.prenom}',${m.quota_drogue||0})" title="Modifier le quota drogue">💊</button>
+          <button class="btn-icon" onclick="toggleActif('${m.id}','${m.prenom}',${m.actif !== false})" title="${m.actif !== false ? 'Désactiver' : 'Réactiver'} ce membre">${m.actif !== false ? '⏸️' : '▶️'}</button>
+          <button class="btn-icon danger" onclick="delMembre('${m.id}','${m.prenom}')" title="Supprimer ce membre">🗑</button>
+        </td>
+      </tr>`).join('') : '<tr><td colspan="7"><div class="empty-state">Aucun membre</div></td></tr>';
+    }
+
+    function openModalMembre() {
+      document.getElementById('m-id').value = '';
+      document.getElementById('m-prenom').value = '';
+      document.getElementById('m-nom').value = '';
+      document.getElementById('m-grade').selectedIndex = 0;
+      document.getElementById('m-role').value = 'membre';
+      document.getElementById('m-quota').value = 0;
+      document.getElementById('m-pwd').value = '';
+      document.getElementById('m-actif').value = 'true';
+      document.getElementById('modal-membre-title').textContent = 'Ajouter un membre';
+      document.getElementById('modal-membre').classList.add('show');
+    }
+
+    async function editMembre(id) {
+      const snap = await db.ref('membres/' + id).once('value');
+      const m = snap.val();
+      document.getElementById('m-id').value = id;
+      document.getElementById('m-prenom').value = m.prenom || '';
+      document.getElementById('m-nom').value = m.nom || '';
+      document.getElementById('m-grade').value = m.grade || GRADES[0];
+      document.getElementById('m-role').value = m.role || 'membre';
+      document.getElementById('m-quota').value = m.quota_drogue || 0;
+      document.getElementById('m-pwd').value = m.mot_de_passe || '';
+      document.getElementById('m-actif').value = m.actif === false ? 'false' : 'true';
+      document.getElementById('modal-membre-title').textContent = 'Modifier ' + m.prenom;
+      document.getElementById('modal-membre').classList.add('show');
+    }
+
+    async function saveMembre() {
+      const id = document.getElementById('m-id').value || genId();
+      const prenom = document.getElementById('m-prenom').value.trim();
+      const nom = document.getElementById('m-nom').value.trim();
+      const grade = document.getElementById('m-grade').value;
+      const role = document.getElementById('m-role').value;
+      const quota = parseInt(document.getElementById('m-quota').value) || 0;
+      const pwd = document.getElementById('m-pwd').value || (prenom.toLowerCase().replace(/\s/g,'') + '2026');
+      const actif = document.getElementById('m-actif').value === 'true';
+      if (!prenom) { Utils.toast('Prénom obligatoire', 'error'); return; }
+      await db.ref('membres/' + id).set({ prenom, nom, grade, role, quota_drogue: quota, mot_de_passe: pwd, actif });
+      Utils.toast('Membre enregistré !');
+      closeModalMembre();
+      await loadMembresAdmin();
+    }
+
+    async function delMembre(id, prenom) {
+      if (!confirm('Supprimer ' + prenom + ' ?')) return;
+      await db.ref('membres/' + id).remove();
+      Utils.toast('Supprimé');
+      await loadMembresAdmin();
+    }
+
+    function closeModalMembre() { document.getElementById('modal-membre').classList.remove('show'); }
+
+    function openGradeMembreModal(id, prenom, gradeActuel) {
+      document.getElementById('gm-id').value = id;
+      document.getElementById('gm-label').textContent = 'Grade de ' + prenom;
+      const sel = document.getElementById('gm-grade');
+      sel.innerHTML = GRADES.map(g => `<option value="${g}" ${g === gradeActuel ? 'selected' : ''}>${g}</option>`).join('');
+      document.getElementById('modal-grade-membre').classList.add('show');
+    }
+
+    async function saveGradeMembre() {
+      const id = document.getElementById('gm-id').value;
+      const grade = document.getElementById('gm-grade').value;
+      const isAdmin = GRADES.indexOf(grade) <= 2;
+      await db.ref('membres/' + id).update({ grade, role: isAdmin ? 'admin' : 'membre' });
+      Utils.toast('Grade mis à jour !');
+      document.getElementById('modal-grade-membre').classList.remove('show');
+      await loadMembresAdmin();
+    }
+
+    function openPwdModal(id, prenom) {
+      document.getElementById('pwd-id').value = id;
+      document.getElementById('pwd-label').textContent = 'Nouveau mot de passe de ' + prenom;
+      document.getElementById('pwd-value').value = '';
+      document.getElementById('modal-pwd').classList.add('show');
+    }
+
+    async function savePwd() {
+      const id = document.getElementById('pwd-id').value;
+      const pwd = document.getElementById('pwd-value').value.trim();
+      if (!pwd) { Utils.toast('Mot de passe vide', 'error'); return; }
+      await db.ref('membres/' + id + '/mot_de_passe').set(pwd);
+      Utils.toast('Mot de passe mis à jour !');
+      document.getElementById('modal-pwd').classList.remove('show');
+    }
+
+    function openQuotaModal(id, prenom, quotaActuel) {
+      document.getElementById('quota-id').value = id;
+      document.getElementById('quota-label').textContent = 'Quota de ' + prenom + ' (par jour)';
+      document.getElementById('quota-value').value = quotaActuel;
+      document.getElementById('modal-quota').classList.add('show');
+    }
+
+    async function saveQuota() {
+      const id = document.getElementById('quota-id').value;
+      const quota = parseInt(document.getElementById('quota-value').value) || 0;
+      await db.ref('membres/' + id + '/quota_drogue').set(quota);
+      Utils.toast('Quota mis à jour !');
+      document.getElementById('modal-quota').classList.remove('show');
+      await loadMembresAdmin();
+    }
+
+    async function toggleActif(id, prenom, estActif) {
+      const action = estActif ? 'Désactiver' : 'Réactiver';
+      if (!confirm(action + ' ' + prenom + ' ?')) return;
+      await db.ref('membres/' + id + '/actif').set(!estActif);
+      Utils.toast(prenom + (estActif ? ' désactivé' : ' réactivé') + ' !');
+      await loadMembresAdmin();
+    }
+
+
+
+    // =================== STOCK ===================
+    async function loadStockAdmin() {
+      const snap = await db.ref('stock').once('value');
+      const zone = document.getElementById('stock-admin-zone');
+      let html = '';
+      Object.entries(snap.val() || {}).forEach(([catId, cat]) => {
+        const produits = Object.entries(cat.produits || {}).map(([id, p]) => ({ id, ...p }));
+        html += `<div style="margin-bottom:24px">
+          <div class="cat-header">
+            <strong>${cat.emoji || ''} ${cat.nom}</strong>
+            <button class="btn-icon" onclick="openCatModal('${catId}','${cat.nom}','${cat.emoji||''}')" title="Modifier le nom et l'emoji de la catégorie">✏️</button>
+            <button class="btn-icon danger" onclick="delCat('${catId}','${cat.nom}')" title="Supprimer cette catégorie et tous ses produits">🗑</button>
+          </div>
+          <div class="prod-add-row">
+            <input type="text" id="p-nom-${catId}" placeholder="Nom du produit">
+            <input type="number" id="p-prix-${catId}" placeholder="Prix" style="width:100px;flex:none">
+            <input type="number" id="p-seuil-${catId}" placeholder="Seuil" style="width:90px;flex:none">
+            <button class="btn btn-secondary btn-sm" onclick="addProduit('${catId}')" title="Ajouter ce produit à la catégorie">+ Produit</button>
+          </div>
+          <div class="table-wrapper">
+            <table>
+              <thead><tr><th>Produit</th><th>Prix</th><th>Seuil</th><th>Stock</th><th></th></tr></thead>
+              <tbody>
+                ${produits.map(p => `<tr>
+                  <td>${p.nom}</td>
+                  <td>${p.prix || 0} $</td>
+                  <td>${p.seuil || 0}</td>
+                  <td>${p.stock || 0}</td>
+                  <td style="display:flex;gap:6px">
+                    <button class="btn-icon" onclick="openProduitModal('${catId}','${p.id}','${p.nom.replace(/'/g,"\\'")}',${p.prix||0},${p.stock||0},${p.seuil||0})" title="Modifier ce produit (nom, prix, stock, seuil)">✏️</button>
+                    <button class="btn-icon danger" onclick="delProduit('${catId}','${p.id}','${p.nom.replace(/'/g,"\\'")}' )" title="Supprimer ce produit">🗑</button>
+                  </td>
+                </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>`;
+      });
+      zone.innerHTML = html || '<div class="empty-state">Aucune catégorie</div>';
+    }
+
+    async function createCat() {
+      const nom = document.getElementById('cat-nom').value.trim();
+      const emoji = document.getElementById('cat-emoji').value.trim() || '📦';
+      if (!nom) return;
+      await db.ref('stock/' + genId()).set({ nom, emoji });
+      document.getElementById('cat-nom').value = '';
+      document.getElementById('cat-emoji').value = '';
+      Utils.toast('Catégorie créée !');
+      await loadStockAdmin();
+    }
+
+    function openCatModal(catId, nom, emoji) {
+      document.getElementById('ec-catid').value = catId;
+      document.getElementById('ec-nom').value = nom;
+      document.getElementById('ec-emoji').value = emoji;
+      document.getElementById('modal-cat').classList.add('show');
+    }
+
+    async function saveCat() {
+      const catId = document.getElementById('ec-catid').value;
+      const nom = document.getElementById('ec-nom').value.trim();
+      const emoji = document.getElementById('ec-emoji').value.trim();
+      if (!nom) return;
+      await db.ref('stock/' + catId).update({ nom, emoji });
+      Utils.toast('Catégorie modifiée !');
+      closeCatModal();
+      await loadStockAdmin();
+    }
+
+    function closeCatModal() { document.getElementById('modal-cat').classList.remove('show'); }
+
+    async function addProduit(catId) {
+      const nom = document.getElementById('p-nom-' + catId).value.trim();
+      const prix = parseFloat(document.getElementById('p-prix-' + catId).value) || 0;
+      const seuil = parseInt(document.getElementById('p-seuil-' + catId).value) || 0;
+      if (!nom) return;
+      await db.ref('stock/' + catId + '/produits/' + genId()).set({ nom, prix, seuil, stock: 0 });
+      Utils.toast('Produit ajouté !');
+      await loadStockAdmin();
+    }
+
+    function openProduitModal(catId, pid, nom, prix, stock, seuil) {
+      document.getElementById('ep-catid').value = catId;
+      document.getElementById('ep-pid').value = pid;
+      document.getElementById('ep-nom').value = nom;
+      document.getElementById('ep-prix').value = prix;
+      document.getElementById('ep-stock').value = stock;
+      document.getElementById('ep-seuil').value = seuil;
+      document.getElementById('modal-produit').classList.add('show');
+    }
+
+    async function saveProduit() {
+      const catId = document.getElementById('ep-catid').value;
+      const pid = document.getElementById('ep-pid').value;
+      const nom = document.getElementById('ep-nom').value.trim();
+      const prix = parseFloat(document.getElementById('ep-prix').value) || 0;
+      const stock = parseInt(document.getElementById('ep-stock').value) || 0;
+      const seuil = parseInt(document.getElementById('ep-seuil').value) || 0;
+      if (!nom) return;
+      await db.ref('stock/' + catId + '/produits/' + pid).update({ nom, prix, stock, seuil });
+      Utils.toast('Produit modifié !');
+      closeProduitModal();
+      await loadStockAdmin();
+    }
+
+    function closeProduitModal() { document.getElementById('modal-produit').classList.remove('show'); }
+
+    async function delCat(id, nom) {
+      if (!confirm('Supprimer la catégorie "' + nom + '" et tous ses produits ?')) return;
+      await db.ref('stock/' + id).remove();
+      Utils.toast('Supprimée');
+      await loadStockAdmin();
+    }
+
+    async function delProduit(catId, pId, nom) {
+      if (!confirm('Supprimer "' + nom + '" ?')) return;
+      await db.ref('stock/' + catId + '/produits/' + pId).remove();
+      Utils.toast('Supprimé');
+      await loadStockAdmin();
+    }
+
+    // =================== ACTIONS DISPO ===================
+    async function loadActionsAdmin() {
+      const snap = await db.ref('actions_dispo').once('value');
+      const list = Object.entries(snap.val() || {}).map(([id, d]) => ({ id, ...d }));
+      document.getElementById('tbody-actions-dispo').innerHTML = list.length ? list.map(a => `<tr>
+        <td>${a.nom}</td>
+        <td style="display:flex;gap:6px">
+          <button class="btn-icon" onclick="openActionModal('${a.id}','${a.nom.replace(/'/g,"\\'")}' )" title="Modifier le nom de cette action">✏️</button>
+          <button class="btn-icon danger" onclick="delActionDispo('${a.id}','${a.nom.replace(/'/g,"\\'")}' )" title="Supprimer cette action">🗑</button>
+        </td>
+      </tr>`).join('') : '<tr><td colspan="2"><div class="empty-state">Aucune action</div></td></tr>';
+    }
+
+    async function addAction() {
+      const nom = document.getElementById('action-nom').value.trim();
+      if (!nom) return;
+      await db.ref('actions_dispo/' + genId()).set({ nom });
+      document.getElementById('action-nom').value = '';
+      Utils.toast('Action ajoutée !');
+      await loadActionsAdmin();
+    }
+
+    function openActionModal(id, nom) {
+      document.getElementById('ea-id').value = id;
+      document.getElementById('ea-nom').value = nom;
+      document.getElementById('modal-action').classList.add('show');
+    }
+
+    async function saveAction() {
+      const id = document.getElementById('ea-id').value;
+      const nom = document.getElementById('ea-nom').value.trim();
+      if (!nom) return;
+      await db.ref('actions_dispo/' + id).update({ nom });
+      Utils.toast('Action modifiée !');
+      closeActionModal();
+      await loadActionsAdmin();
+    }
+
+    function closeActionModal() { document.getElementById('modal-action').classList.remove('show'); }
+
+    async function delActionDispo(id, nom) {
+      if (!confirm('Supprimer "' + nom + '" ?')) return;
+      await db.ref('actions_dispo/' + id).remove();
+      Utils.toast('Supprimée');
+      await loadActionsAdmin();
+    }
+
+    // =================== PERMISSIONS ===================
+    async function loadPerms() {
+      const snap = await db.ref('permissions').once('value');
+      const permsData = snap.val() || {};
+      let html = '<div class="table-wrapper"><table><thead><tr><th>Grade</th>';
+      PAGES_DISPO.forEach(p => html += `<th style="font-size:10px;text-align:center">${p}</th>`);
+      html += '</tr></thead><tbody>';
+      GRADES.forEach(grade => {
+        const gradePerms = permsData[grade] || {};
+        const defaults = PERMS_DEFAUT[grade] || [];
+        html += `<tr><td><strong>${grade}</strong></td>`;
+        PAGES_DISPO.forEach(page => {
+          const checked = gradePerms[page] !== undefined ? gradePerms[page] : defaults.includes(page);
+          html += `<td style="text-align:center"><input type="checkbox" data-grade="${grade}" data-page="${page}" ${checked ? 'checked' : ''} title="${grade} — ${page}"></td>`;
+        });
+        html += '</tr>';
+      });
+      html += '</tbody></table></div>';
+      document.getElementById('perms-zone').innerHTML = html;
+    }
+
+    async function savePerms() {
+      const checks = document.querySelectorAll('#perms-zone input[type=checkbox]');
+      const perms = {};
+      checks.forEach(c => {
+        const grade = c.dataset.grade;
+        const page = c.dataset.page;
+        if (!perms[grade]) perms[grade] = {};
+        perms[grade][page] = c.checked;
+      });
+      await db.ref('permissions').set(perms);
+      Utils.toast('Permissions enregistrées !');
+    }
+
+    loadSemaines();
+  </script>
+</body>
+</html>

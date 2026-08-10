@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mode TV — Vizu 6Block's</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #16181c;
+      color: #f2f4f7;
+      font-family: 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+    .tv-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 24px;
+      background: #1c1f24;
+      border-bottom: 2px solid #2ea8ff;
+    }
+    .tv-title { font-size: 20px; font-weight: 800; color: #2ea8ff; }
+    .tv-semaine { font-size: 13px; color: #8a939e; }
+    .tv-time { font-size: 22px; font-weight: 700; color: #f2f4f7; }
+    .tv-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 16px;
+      padding: 16px;
+      height: calc(100vh - 90px);
+    }
+    .tv-card {
+      background: #1c1f24;
+      border: 1px solid #2a2e35;
+      border-radius: 10px;
+      padding: 16px;
+      overflow: hidden;
+    }
+    .tv-card-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #2ea8ff;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 12px;
+      border-bottom: 1px solid #2a2e35;
+      padding-bottom: 8px;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { color: #8a939e; font-size: 10px; text-transform: uppercase; padding: 4px 8px; }
+    td { padding: 6px 8px; border-bottom: 1px solid #22180a; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+    .ok { background: #27ae6020; color: #2ecc71; border: 1px solid #27ae6040; }
+    .ko { background: #c0392b20; color: #e74c3c; border: 1px solid #c0392b40; }
+    .acc { background: #2ea8ff20; color: #2ea8ff; border: 1px solid #2ea8ff40; }
+    .ticker {
+      position: fixed;
+      bottom: 0;
+      left: 0; right: 0;
+      background: #2ea8ff;
+      color: #16181c;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 6px 0;
+      overflow: hidden;
+    }
+    .ticker-inner {
+      white-space: nowrap;
+      animation: scroll 40s linear infinite;
+    }
+    @keyframes scroll { from { transform: translateX(100vw); } to { transform: translateX(-100%); } }
+    .rank-1 { color: #ffd700; font-weight: 800; }
+    .rank-2 { color: #c0c0c0; font-weight: 700; }
+    .rank-3 { color: #cd7f32; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="tv-header">
+    <div class="tv-title">🎸 Vizu 6Block's</div>
+    <div class="tv-semaine" id="tv-semaine">—</div>
+    <div class="tv-time" id="tv-time">00:00:00</div>
+  </div>
+
+  <div class="tv-grid">
+    <!-- Classement -->
+    <div class="tv-card">
+      <div class="tv-card-title">🏆 Classement</div>
+      <table>
+        <thead><tr><th>#</th><th>Membre</th><th>Actions</th><th>Gains</th></tr></thead>
+        <tbody id="tv-classement"></tbody>
+      </table>
+    </div>
+
+    <!-- Dernières actions -->
+    <div class="tv-card">
+      <div class="tv-card-title">📋 Dernières actions</div>
+      <table>
+        <thead><tr><th>Heure</th><th>Membre</th><th>Action</th><th>Résultat</th></tr></thead>
+        <tbody id="tv-actions"></tbody>
+      </table>
+    </div>
+
+    <!-- Stock alertes + soldes -->
+    <div class="tv-card">
+      <div class="tv-card-title">📦 Alertes stock</div>
+      <div id="tv-alertes"></div>
+      <div style="margin-top:16px">
+        <div class="tv-card-title">💰 Soldes</div>
+        <div style="display:flex;gap:16px;margin-top:8px">
+          <div style="flex:1;text-align:center">
+            <div style="font-size:10px;color:#8a939e;text-transform:uppercase">Sale</div>
+            <div style="font-size:18px;font-weight:700;color:#2ea8ff" id="tv-sale">—</div>
+          </div>
+          <div style="flex:1;text-align:center">
+            <div style="font-size:10px;color:#8a939e;text-transform:uppercase">Propre</div>
+            <div style="font-size:18px;font-weight:700;color:#27ae60" id="tv-propre">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ticker"><div class="ticker-inner" id="ticker">Vizu 6Block's — Chargement des données...</div></div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="../js/firebase-config.js"></script>
+  <script src="../js/app.js"></script>
+  <script>
+    function updateClock() {
+      document.getElementById('tv-time').textContent = new Date().toLocaleTimeString('fr-FR');
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    async function loadTV() {
+      const semaine = await getSemaineActive();
+      document.getElementById('tv-semaine').textContent = semaine ? semaine.nom : 'Aucune semaine active';
+
+      // Argent
+      let sale = 0, propre = 0;
+      const s = await db.ref('argent/sale').once('value');
+      Object.values(s.val() || {}).forEach(d => sale += (d.type === 'Entrée' ? 1 : -1) * (d.montant || 0));
+      const p = await db.ref('argent/propre').once('value');
+      Object.values(p.val() || {}).forEach(d => propre += (d.type === 'Entrée' ? 1 : -1) * (d.montant || 0));
+      document.getElementById('tv-sale').textContent = sale.toLocaleString('fr-FR') + ' $';
+      document.getElementById('tv-propre').textContent = propre.toLocaleString('fr-FR') + ' $';
+
+      // Actions
+      let actions = [];
+      if (semaine) {
+        const snap = await db.ref('actions/' + semaine.id).once('value');
+        actions = Object.entries(snap.val() || {}).map(([id, d]) => ({ id, ...d }));
+      }
+
+      // Classement
+      const stats = {};
+      actions.forEach(a => {
+        if (!stats[a.membre_id]) stats[a.membre_id] = { nom: a.prenom_membre || '', total: 0, reussi: 0, gains: 0 };
+        stats[a.membre_id].total++;
+        if (a.resultat === 'Succès') { stats[a.membre_id].reussi++; stats[a.membre_id].gains += a.gains_totaux || 0; }
+      });
+      const cl = Object.values(stats).sort((a, b) => b.gains - a.gains);
+      document.getElementById('tv-classement').innerHTML = cl.slice(0, 8).map((m, i) => `<tr>
+        <td class="${i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : ''}">${i + 1}</td>
+        <td>${m.nom}</td><td>${m.total}</td>
+        <td style="color:#2ea8ff">${m.gains.toLocaleString('fr-FR')} $</td>
+      </tr>`).join('') || '<tr><td colspan="4" style="text-align:center;color:#8a939e">Aucune action</td></tr>';
+
+      // Dernières actions
+      const sorted = [...actions].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 8);
+      document.getElementById('tv-actions').innerHTML = sorted.map(a => `<tr>
+        <td>${a.heure || '-'}</td>
+        <td>${a.prenom_membre || '-'}</td>
+        <td>${a.action || '-'}</td>
+        <td><span class="badge ${a.resultat === 'Succès' ? 'ok' : 'ko'}">${a.resultat}</span></td>
+      </tr>`).join('') || '<tr><td colspan="4" style="text-align:center;color:#8a939e">Aucune action</td></tr>';
+
+      // Alertes stock
+      let alertesHTML = '';
+      const snapS = await db.ref('stock').once('value');
+      const tickerItems = ['🎸 Vizu 6Block's'];
+      Object.values(snapS.val() || {}).forEach(cat => {
+        Object.values(cat.produits || {}).forEach(p => {
+          if (p.stock <= p.seuil) {
+            alertesHTML += `<div style="padding:6px 0;border-bottom:1px solid #22180a;font-size:12px"><span style="color:#e74c3c">⚠</span> ${p.nom} : ${p.stock} unités</div>`;
+            tickerItems.push(`⚠️ Stock bas : ${p.nom} (${p.stock} restants)`);
+          }
+        });
+      });
+      tickerItems.push(`💰 Sale : ${sale.toLocaleString('fr-FR')} $`, `🏦 Propre : ${propre.toLocaleString('fr-FR')} $`);
+      cl.forEach((m, i) => tickerItems.push(`${i + 1 === 1 ? '🥇' : i + 1 === 2 ? '🥈' : '🥉'} ${m.nom} — ${m.gains.toLocaleString('fr-FR')} $`));
+
+      document.getElementById('tv-alertes').innerHTML = alertesHTML || '<div style="color:#8a939e;font-size:13px">✅ Aucune alerte stock</div>';
+      document.getElementById('ticker').textContent = tickerItems.join('   ·   ');
+    }
+
+    loadTV();
+    setInterval(loadTV, 30000);
+  </script>
+</body>
+</html>

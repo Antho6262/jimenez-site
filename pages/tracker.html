@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tracker — Vizu 6Block's</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <div id="sidebar"></div>
+  <div id="main">
+    <div class="page-header">
+      <div class="page-title">📋 <span>Tracker</span></div>
+      <button class="btn btn-primary" onclick="openModal()">+ Nouvelle action</button>
+    </div>
+
+    <div class="filters">
+      <select id="f-membre"><option value="">Tous les membres</option></select>
+      <select id="f-action"><option value="">Toutes les actions</option></select>
+      <select id="f-resultat">
+        <option value="">Tous les résultats</option>
+        <option value="Succès">Succès</option>
+        <option value="Échec">Échec</option>
+      </select>
+      <button class="btn btn-secondary" onclick="loadActions()" title="Actualiser la liste">🔄</button>
+    </div>
+
+    <div class="card">
+      <div class="table-wrapper">
+        <table>
+          <thead><tr>
+            <th>Date</th><th>Heure</th><th>Membre(s)</th><th>Action</th>
+            <th>Produit</th><th>Qté</th><th>Résultat</th><th>Raison</th><th>Gains</th><th></th>
+          </tr></thead>
+          <tbody id="tbody-actions"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal nouvelle action -->
+  <div class="modal-overlay" id="modal">
+    <div class="modal" style="max-width:600px">
+      <div class="modal-title">➕ Nouvelle action</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Membre</label>
+          <select id="m-membre"></select>
+        </div>
+        <div class="form-group">
+          <label>Membre 2 (optionnel)</label>
+          <select id="m-membre2"><option value="">— Aucun —</option></select>
+        </div>
+        <div class="form-group">
+          <label>Action</label>
+          <select id="m-action" onchange="onActionChange()"></select>
+        </div>
+        <div class="form-group" id="grp-produit" style="display:none">
+          <label>Produit drogue</label>
+          <select id="m-produit"></select>
+        </div>
+        <div class="form-group">
+          <label>Quantité</label>
+          <input type="number" id="m-qte" value="1" min="1">
+        </div>
+        <div class="form-group">
+          <label>Résultat</label>
+          <select id="m-resultat" onchange="onResultatChange()">
+            <option value="Succès">Succès</option>
+            <option value="Échec">Échec</option>
+          </select>
+        </div>
+        <div class="form-group" id="grp-raison" style="display:none">
+          <label>Raison de l'échec</label>
+          <input type="text" id="m-raison" placeholder="Ex: fuite policière">
+        </div>
+        <div class="form-group">
+          <label>Argent sale gagné ($)</label>
+          <input type="number" id="m-argent-sale" value="0" min="0">
+        </div>
+        <div class="form-group">
+          <label>Argent propre gagné ($)</label>
+          <input type="number" id="m-argent-propre" value="0" min="0">
+        </div>
+        <div class="form-group">
+          <label>Date</label>
+          <input type="date" id="m-date">
+        </div>
+        <div class="form-group">
+          <label>Heure</label>
+          <input type="time" id="m-heure">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal()">Annuler</button>
+        <button class="btn btn-primary" onclick="saveAction()">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="../js/firebase-config.js"></script>
+  <script src="../js/app.js"></script>
+  <script>
+    buildSidebar('tracker');
+    let semaine = null;
+    let allActions = [];
+    let membres = [];
+    let actionsDispo = [];
+    let drogueProduits = [];
+    let stockData = {};
+
+    // Règles de décrémentation stock selon l'action
+    const STOCK_RULES = {
+      'Vente de Drogue':   { type: 'drogue' },
+      'ATM':               [{ nom: 'Boîtier de piratage', qte: 1 }],
+      'Cambu':             [{ nom: 'Outil de crochetage', qte: 1 }],
+      'Plantation':        [{ nom: 'Eau', qte: 1 }, { nom: 'Fertilisant', qte: 1 }, { nom: 'Graine', qte: 1 }, { nom: 'Pot', qte: 1 }],
+      'Vente de Branches': [{ nom: 'Branche de cannabis', qte: 1 }],
+    };
+
+    async function init() {
+      semaine = await getSemaineActive();
+      membres = await getMembres();
+
+      const snapA = await db.ref('actions_dispo').once('value');
+      actionsDispo = Object.entries(snapA.val() || {}).map(([id, d]) => ({ id, ...d }));
+
+      const snapS = await db.ref('stock').once('value');
+      stockData = snapS.val() || {};
+      Object.entries(stockData).forEach(([catId, cat]) => {
+        if (cat.nom === 'Drogues') {
+          drogueProduits = Object.entries(cat.produits || {}).map(([id, p]) => ({ id, catId, ...p }));
+        }
+      });
+
+      // Peupler filtres
+      membres.forEach(m => {
+        document.getElementById('f-membre').innerHTML += `<option value="${m.id}">${m.prenom} ${m.nom || ''}</option>`;
+        document.getElementById('m-membre').innerHTML += `<option value="${m.id}">${m.prenom} ${m.nom || ''}</option>`;
+        document.getElementById('m-membre2').innerHTML += `<option value="${m.id}">${m.prenom} ${m.nom || ''}</option>`;
+      });
+
+      actionsDispo.forEach(a => {
+        document.getElementById('f-action').innerHTML += `<option value="${a.nom}">${a.nom}</option>`;
+        document.getElementById('m-action').innerHTML += `<option value="${a.nom}">${a.nom}</option>`;
+      });
+
+      drogueProduits.forEach(p => {
+        document.getElementById('m-produit').innerHTML += `<option value="${p.id}" data-catid="${p.catId}">${p.nom}</option>`;
+      });
+
+      // Pré-sélectionner le membre connecté
+      const user = Auth.membre;
+      if (user) {
+        const opts = document.getElementById('m-membre').options;
+        for (let o of opts) {
+          const m = membres.find(m => m.id === o.value);
+          if (m && m.prenom === user.prenom) { o.selected = true; break; }
+        }
+      }
+
+      const now = new Date();
+      document.getElementById('m-date').value = now.toISOString().split('T')[0];
+      document.getElementById('m-heure').value = now.toTimeString().slice(0, 5);
+
+      await loadActions();
+    }
+
+    function onActionChange() {
+      const action = document.getElementById('m-action').value;
+      document.getElementById('grp-produit').style.display = action === 'Vente de Drogue' ? 'block' : 'none';
+    }
+
+    function onResultatChange() {
+      const r = document.getElementById('m-resultat').value;
+      document.getElementById('grp-raison').style.display = r === 'Échec' ? 'block' : 'none';
+    }
+
+    async function loadActions() {
+      if (!semaine) {
+        document.getElementById('tbody-actions').innerHTML = '<tr><td colspan="10"><div class="empty-state"><div class="empty-icon">⚠️</div>Aucune semaine active</div></td></tr>';
+        return;
+      }
+      const snap = await db.ref('actions/' + semaine.id).once('value');
+      allActions = Object.entries(snap.val() || {}).map(([id, d]) => ({ id, ...d }));
+      allActions.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      renderActions();
+    }
+
+    function renderActions() {
+      const fM = document.getElementById('f-membre').value;
+      const fA = document.getElementById('f-action').value;
+      const fR = document.getElementById('f-resultat').value;
+      const user = Auth.membre;
+      const canDel = user && (user.grade === 'Fondateur' || user.grade === 'Lead' || user.grade === 'Co-Lead' || user.role === 'admin');
+
+      const filtered = allActions.filter(a =>
+        (!fM || a.membre_id === fM) &&
+        (!fA || a.action === fA) &&
+        (!fR || a.resultat === fR)
+      );
+
+      const tbody = document.getElementById('tbody-actions');
+      if (!filtered.length) {
+        tbody.innerHTML = '<tr><td colspan="10"><div class="empty-state"><div class="empty-icon">📋</div>Aucune action trouvée</div></td></tr>';
+        return;
+      }
+      tbody.innerHTML = filtered.map(a => `<tr>
+        <td style="color:var(--text-muted)">${a.date || '-'}</td>
+        <td style="color:var(--text-muted)">${a.heure || '-'}</td>
+        <td><strong>${a.prenom_membre || '-'}</strong>${a.prenom_membre2 ? ' + ' + a.prenom_membre2 : ''}</td>
+        <td>${a.action || '-'}</td>
+        <td style="color:var(--text-muted)">${a.produit_drogue || '-'}</td>
+        <td>${a.quantite || '-'}</td>
+        <td><span class="badge ${a.resultat === 'Succès' ? 'badge-success' : 'badge-danger'}">${a.resultat || '-'}</span></td>
+        <td style="font-size:11px;color:#e07070">${a.resultat === 'Échec' && a.raison_echec ? a.raison_echec : '—'}</td>
+        <td style="color:var(--accent);font-weight:600">${a.gains_totaux > 0 ? Utils.fmt(a.gains_totaux) : '—'}</td>
+        <td>${canDel ? `<button class="btn btn-danger btn-sm" onclick="deleteAction('${a.id}')" title="Supprimer cette action">🗑</button>` : ''}</td>
+      </tr>`).join('');
+    }
+
+    async function saveAction() {
+      if (!semaine) { Utils.toast('Aucune semaine active', 'error'); return; }
+
+      const membreId = document.getElementById('m-membre').value;
+      const membre2Id = document.getElementById('m-membre2').value;
+      const action = document.getElementById('m-action').value;
+      const qte = parseInt(document.getElementById('m-qte').value) || 1;
+      const resultat = document.getElementById('m-resultat').value;
+      const raison = document.getElementById('m-raison').value;
+      const argSale = parseFloat(document.getElementById('m-argent-sale').value) || 0;
+      const argPropre = parseFloat(document.getElementById('m-argent-propre').value) || 0;
+      const date = document.getElementById('m-date').value;
+      const heure = document.getElementById('m-heure').value;
+
+      if (!membreId || !action) { Utils.toast('Membre et action obligatoires', 'error'); return; }
+
+      const membre = membres.find(m => m.id === membreId);
+      const membre2 = membre2Id ? membres.find(m => m.id === membre2Id) : null;
+
+      // Produit drogue
+      let produitNom = '', produitId = '', produitCatId = '';
+      if (action === 'Vente de Drogue') {
+        const sel = document.getElementById('m-produit');
+        produitId = sel.value;
+        produitNom = sel.options[sel.selectedIndex]?.text || '';
+        produitCatId = sel.options[sel.selectedIndex]?.dataset?.catid || '';
+      }
+
+      const id = genId();
+      await db.ref('actions/' + semaine.id + '/' + id).set({
+        membre_id: membreId,
+        prenom_membre: membre?.prenom || '',
+        nom_membre: membre?.nom || '',
+        grade_membre: membre?.grade || '',
+        prenom_membre2: membre2?.prenom || '',
+        action, quantite: qte, date, heure, resultat,
+        raison_echec: raison,
+        produit_drogue: produitNom,
+        produit_drogue_id: produitId,
+        argent_sale: argSale,
+        argent_propre: argPropre,
+        gains_totaux: argSale + argPropre,
+        createdAt: Date.now()
+      });
+
+      // Décrémenter stock si succès
+      if (resultat === 'Succès') {
+        await appliquerStockAuto(action, qte, produitCatId, produitId);
+      }
+
+      // Enregistrer gains dans argent
+      if (argSale > 0) {
+        await db.ref('argent/sale/' + genId()).set({ date, description: action + ' (' + (membre?.prenom || '') + ')', type: 'Entrée', montant: argSale, responsable: membre?.prenom || '', createdAt: Date.now() });
+      }
+      if (argPropre > 0) {
+        await db.ref('argent/propre/' + genId()).set({ date, description: action + ' (' + (membre?.prenom || '') + ')', type: 'Entrée', montant: argPropre, responsable: membre?.prenom || '', createdAt: Date.now() });
+      }
+
+      Utils.toast('Action enregistrée !');
+      closeModal();
+      await loadActions();
+    }
+
+    async function appliquerStockAuto(action, qte, produitCatId, produitId) {
+      const rule = STOCK_RULES[action];
+      if (!rule) return;
+
+      if (rule.type === 'drogue') {
+        if (produitId && produitCatId) {
+          const ref = db.ref('stock/' + produitCatId + '/produits/' + produitId + '/stock');
+          const snap = await ref.once('value');
+          await ref.set(Math.max(0, (snap.val() || 0) - qte));
+        }
+        return;
+      }
+
+      // Recharger stock frais
+      const snapS = await db.ref('stock').once('value');
+      const stock = snapS.val() || {};
+      for (const item of rule) {
+        for (const [catId, cat] of Object.entries(stock)) {
+          for (const [pId, p] of Object.entries(cat.produits || {})) {
+            if (p.nom === item.nom) {
+              const ref = db.ref('stock/' + catId + '/produits/' + pId + '/stock');
+              await ref.set(Math.max(0, (p.stock || 0) - (item.qte * qte)));
+            }
+          }
+        }
+      }
+    }
+
+    async function deleteAction(id) {
+      if (!confirm('Supprimer cette action ?')) return;
+      await db.ref('actions/' + semaine.id + '/' + id).remove();
+      Utils.toast('Action supprimée');
+      await loadActions();
+    }
+
+    function openModal() { document.getElementById('modal').classList.add('show'); }
+    function closeModal() { document.getElementById('modal').classList.remove('show'); }
+
+    document.getElementById('f-membre').addEventListener('change', renderActions);
+    document.getElementById('f-action').addEventListener('change', renderActions);
+    document.getElementById('f-resultat').addEventListener('change', renderActions);
+
+    init();
+  </script>
+</body>
+</html>

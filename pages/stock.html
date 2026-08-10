@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stock — Vizu 6Block's</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .cat-tabs { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:20px; }
+    .cat-tab { padding:7px 14px; border-radius:6px; border:1px solid var(--border); cursor:pointer; font-size:13px; color:var(--text-muted); transition:all .15s; }
+    .cat-tab:hover { border-color:var(--accent); color:var(--text); }
+    .cat-tab.active { background:var(--accent); color:#16181c; border-color:var(--accent); font-weight:600; }
+    .stock-status-ok { color:var(--success); font-weight:700; }
+    .stock-status-low { color:var(--warning); font-weight:700; }
+    .stock-status-empty { color:var(--danger); font-weight:700; }
+  </style>
+</head>
+<body>
+  <div id="sidebar"></div>
+  <div id="main">
+    <div class="page-header">
+      <div class="page-title">📦 <span>Stock</span></div>
+      <button class="btn btn-secondary" onclick="loadStock()" title="Actualiser le stock">🔄 Actualiser</button>
+    </div>
+
+    <div class="cat-tabs" id="cat-tabs"></div>
+
+    <!-- Vue stock -->
+    <div id="view-stock">
+      <div class="stats-grid" id="stock-stats" style="margin-bottom:20px"></div>
+      <div class="card">
+        <div class="card-title" id="stock-title">Chargement...</div>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>Produit</th><th>Prix unitaire</th><th>Stock actuel</th><th>Seuil alerte</th><th>Valeur</th><th>Statut</th><th></th></tr></thead>
+            <tbody id="tbody-stock"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Vue argent -->
+    <div id="view-argent" style="display:none">
+      <div class="stats-grid" style="margin-bottom:20px;grid-template-columns:1fr 1fr">
+        <div class="stat-card"><div class="stat-icon">💰</div><div class="stat-value" id="solde-sale">—</div><div class="stat-label">Solde Argent Sale</div></div>
+        <div class="stat-card"><div class="stat-icon">🤍</div><div class="stat-value" id="solde-propre">—</div><div class="stat-label">Solde Argent Propre</div></div>
+      </div>
+
+      <!-- Ajout manuel admin -->
+      <div id="ajout-manuel" style="display:none;margin-bottom:20px">
+        <div class="card">
+          <div class="card-title">Mouvement manuel</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Compte</label>
+              <select id="aj-type"><option value="sale">💰 Argent Sale</option><option value="propre">🤍 Argent Propre</option></select>
+            </div>
+            <div class="form-group">
+              <label>Mouvement</label>
+              <select id="aj-mouvement"><option value="Entrée">➕ Entrée</option><option value="Sortie">➖ Sortie</option></select>
+            </div>
+            <div class="form-group">
+              <label>Montant ($)</label>
+              <input type="number" id="aj-montant" min="0" placeholder="0">
+            </div>
+            <div class="form-group">
+              <label>Description</label>
+              <input type="text" id="aj-desc" placeholder="Ex: Apport initial">
+            </div>
+            <div class="form-group">
+              <label>Responsable</label>
+              <input type="text" id="aj-resp" placeholder="Prénom">
+            </div>
+          </div>
+          <button class="btn btn-primary" style="margin-top:12px" onclick="ajouterArgent()">Enregistrer</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Historique des mouvements</div>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>Date</th><th>Compte</th><th>Type</th><th>Montant</th><th>Description</th><th>Responsable</th></tr></thead>
+            <tbody id="tbody-argent"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal édition stock -->
+  <div class="modal-overlay" id="modal-stock">
+    <div class="modal">
+      <div class="modal-title">✏️ Modifier le stock</div>
+      <input type="hidden" id="es-catid">
+      <input type="hidden" id="es-pid">
+      <div class="form-group" style="margin-bottom:12px">
+        <label>Produit</label>
+        <div id="es-nom" style="font-weight:600;color:var(--accent);padding:8px 0"></div>
+      </div>
+      <div class="form-grid">
+        <div class="form-group"><label>Stock actuel</label><input type="number" id="es-stock" min="0"></div>
+        <div class="form-group"><label>Seuil alerte</label><input type="number" id="es-seuil" min="0"></div>
+        <div class="form-group"><label>Prix unitaire ($)</label><input type="number" id="es-prix" min="0"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeStockModal()">Annuler</button>
+        <button class="btn btn-primary" onclick="saveStockEdit()">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="../js/firebase-config.js"></script>
+  <script src="../js/app.js"></script>
+  <script>
+    buildSidebar('stock');
+    let allStock = null;
+    let currentCat = null;
+
+    async function loadStock() {
+      const snap = await db.ref('stock').once('value');
+      allStock = snap.val() || {};
+      const catIds = Object.keys(allStock);
+      if (!currentCat || !allStock[currentCat]) currentCat = catIds[0];
+
+      // Tabs
+      const tabsEl = document.getElementById('cat-tabs');
+      tabsEl.innerHTML = catIds.map(id => {
+        const c = allStock[id];
+        return `<div class="cat-tab ${id === currentCat ? 'active' : ''}" onclick="switchCat('${id}',this)">${c.emoji || ''} ${c.nom}</div>`;
+      }).join('') + `<div class="cat-tab" id="tab-argent" onclick="switchToArgent(this)">💰 Argent</div>`;
+
+      document.getElementById('view-stock').style.display = 'block';
+      document.getElementById('view-argent').style.display = 'none';
+      renderCat();
+    }
+
+    function switchCat(id, el) {
+      currentCat = id;
+      document.querySelectorAll('.cat-tab').forEach(t => t.classList.remove('active'));
+      el.classList.add('active');
+      document.getElementById('view-stock').style.display = 'block';
+      document.getElementById('view-argent').style.display = 'none';
+      renderCat();
+    }
+
+    function switchToArgent(el) {
+      document.querySelectorAll('.cat-tab').forEach(t => t.classList.remove('active'));
+      el.classList.add('active');
+      document.getElementById('view-stock').style.display = 'none';
+      document.getElementById('view-argent').style.display = 'block';
+      if (isAdmin()) {
+        document.getElementById('ajout-manuel').style.display = 'block';
+        const user = Auth.membre;
+        document.getElementById('aj-resp').value = user?.prenom || '';
+      }
+      loadSoldes();
+      loadArgentHistorique();
+    }
+
+    function renderCat() {
+      const cat = allStock[currentCat];
+      if (!cat) return;
+      document.getElementById('stock-title').textContent = (cat.emoji || '') + ' ' + cat.nom;
+      const prods = Object.entries(cat.produits || {}).map(([id, p]) => ({ id, ...p }));
+
+      const total = prods.reduce((s, p) => s + ((p.stock||0) * (p.prix||0)), 0);
+      const ok = prods.filter(p => (p.stock||0) > (p.seuil||0)).length;
+      const faible = prods.filter(p => (p.stock||0) > 0 && (p.stock||0) <= (p.seuil||0)).length;
+      const rupture = prods.filter(p => (p.stock||0) === 0).length;
+
+      document.getElementById('stock-stats').innerHTML = [
+        { label: 'Produits', value: prods.length, color: 'var(--text)' },
+        { label: 'En stock OK', value: ok, color: 'var(--success)' },
+        { label: 'Stock faible', value: faible, color: 'var(--warning)' },
+        { label: 'Rupture', value: rupture, color: 'var(--danger)' },
+        { label: 'Valeur totale', value: Utils.fmt(total), color: 'var(--accent)' },
+      ].map(s => `<div class="stat-card"><div class="stat-icon"></div><div class="stat-value" style="color:${s.color}">${s.value}</div><div class="stat-label">${s.label}</div></div>`).join('');
+
+      document.getElementById('tbody-stock').innerHTML = prods.map(p => {
+        const stock = p.stock || 0;
+        const seuil = p.seuil || 0;
+        let statut, cls, stockCls;
+        if (stock === 0) { statut = 'RUPTURE'; cls = 'badge-danger'; stockCls = 'stock-status-empty'; }
+        else if (stock <= seuil) { statut = 'FAIBLE'; cls = 'badge-warning'; stockCls = 'stock-status-low'; }
+        else { statut = 'OK'; cls = 'badge-success'; stockCls = 'stock-status-ok'; }
+        return `<tr>
+          <td>${p.nom}</td>
+          <td>${Utils.fmt(p.prix || 0)}</td>
+          <td class="${stockCls}">${stock}</td>
+          <td style="color:var(--text-muted)">${seuil}</td>
+          <td style="color:var(--accent)">${Utils.fmt(stock * (p.prix||0))}</td>
+          <td><span class="badge ${cls}">${statut}</span></td>
+          <td><button class="btn btn-secondary btn-sm" onclick="openStockModal('${currentCat}','${p.id}','${p.nom.replace(/'/g,"\\'")}',${stock},${seuil},${p.prix||0})" title="Modifier ce produit">✏️ Éditer</button></td>
+        </tr>`;
+      }).join('') || '<tr><td colspan="7"><div class="empty-state">Aucun produit</div></td></tr>';
+    }
+
+    function openStockModal(catId, pid, nom, stock, seuil, prix) {
+      document.getElementById('es-catid').value = catId;
+      document.getElementById('es-pid').value = pid;
+      document.getElementById('es-nom').textContent = nom;
+      document.getElementById('es-stock').value = stock;
+      document.getElementById('es-seuil').value = seuil;
+      document.getElementById('es-prix').value = prix;
+      document.getElementById('modal-stock').classList.add('show');
+    }
+
+    async function saveStockEdit() {
+      const catId = document.getElementById('es-catid').value;
+      const pid = document.getElementById('es-pid').value;
+      const stock = parseInt(document.getElementById('es-stock').value) || 0;
+      const seuil = parseInt(document.getElementById('es-seuil').value) || 0;
+      const prix = parseFloat(document.getElementById('es-prix').value) || 0;
+      await db.ref('stock/' + catId + '/produits/' + pid).update({ stock, seuil, prix });
+      allStock[catId].produits[pid] = { ...allStock[catId].produits[pid], stock, seuil, prix };
+      Utils.toast('Stock mis à jour !');
+      closeStockModal();
+      renderCat();
+    }
+
+    function closeStockModal() { document.getElementById('modal-stock').classList.remove('show'); }
+
+    async function loadSoldes() {
+      let sale = 0, propre = 0;
+      const s = await db.ref('argent/sale').once('value');
+      Object.values(s.val() || {}).forEach(d => sale += (d.type === 'Entrée' ? 1 : -1) * (d.montant || 0));
+      const p = await db.ref('argent/propre').once('value');
+      Object.values(p.val() || {}).forEach(d => propre += (d.type === 'Entrée' ? 1 : -1) * (d.montant || 0));
+      document.getElementById('solde-sale').textContent = Utils.fmt(Math.max(0, sale));
+      document.getElementById('solde-propre').textContent = Utils.fmt(Math.max(0, propre));
+    }
+
+    async function loadArgentHistorique() {
+      const [snapS, snapP] = await Promise.all([db.ref('argent/sale').once('value'), db.ref('argent/propre').once('value')]);
+      const list = [];
+      Object.entries(snapS.val() || {}).forEach(([k, v]) => list.push({ id: k, compte: 'Sale', ...v }));
+      Object.entries(snapP.val() || {}).forEach(([k, v]) => list.push({ id: k, compte: 'Propre', ...v }));
+      list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      const tbody = document.getElementById('tbody-argent');
+      tbody.innerHTML = list.length ? list.map(m => `<tr>
+        <td style="color:var(--text-muted)">${m.date || ''}</td>
+        <td>${m.compte === 'Sale' ? '💰 Sale' : '🤍 Propre'}</td>
+        <td><span class="badge ${m.type === 'Entrée' ? 'badge-success' : 'badge-danger'}">${m.type}</span></td>
+        <td style="font-weight:700;color:${m.type === 'Entrée' ? 'var(--success)' : 'var(--danger)'}">${Utils.fmt(m.montant || 0)}</td>
+        <td style="color:var(--text-muted)">${m.description || ''}</td>
+        <td style="color:var(--text-muted)">${m.responsable || ''}</td>
+      </tr>`).join('') : '<tr><td colspan="6"><div class="empty-state">Aucun mouvement</div></td></tr>';
+    }
+
+    async function ajouterArgent() {
+      const type = document.getElementById('aj-type').value;
+      const mouvement = document.getElementById('aj-mouvement').value;
+      const montant = parseFloat(document.getElementById('aj-montant').value) || 0;
+      const desc = document.getElementById('aj-desc').value.trim() || 'Ajout manuel';
+      const resp = document.getElementById('aj-resp').value.trim() || Auth.membre?.prenom || '';
+      if (montant <= 0) { Utils.toast('Montant invalide', 'error'); return; }
+      const now = new Date();
+      await db.ref('argent/' + type + '/' + genId()).set({ date: Utils.dateStr(now) + ' ' + Utils.heureStr(now), description: desc, type: mouvement, montant, responsable: resp, createdAt: Date.now() });
+      document.getElementById('aj-montant').value = '';
+      document.getElementById('aj-desc').value = '';
+      Utils.toast('Enregistré !');
+      loadSoldes();
+      loadArgentHistorique();
+    }
+
+    loadStock();
+  </script>
+</body>
+</html>

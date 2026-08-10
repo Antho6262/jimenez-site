@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Objectifs — Vizu 6Block's</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .progress-bar { background: var(--border); border-radius: 4px; height: 8px; overflow: hidden; }
+    .progress-fill { background: var(--accent); height: 100%; border-radius: 4px; transition: width 0.3s; }
+  </style>
+</head>
+<body>
+  <div id="sidebar"></div>
+  <div id="main">
+    <div class="page-header">
+      <div class="page-title">🏆 <span>Objectifs</span></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Objectifs du groupe</div>
+      <div id="obj-groupe"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Objectifs individuels</div>
+      <div id="obj-membres"></div>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="../js/firebase-config.js"></script>
+  <script src="../js/app.js"></script>
+  <script>
+    buildSidebar('objectifs');
+
+    async function load() {
+      const semaine = await getSemaineActive();
+      const membres = await getMembres();
+
+      let actions = [];
+      if (semaine) {
+        const snap = await db.ref('actions/' + semaine.id).once('value');
+        actions = Object.entries(snap.val() || {}).map(([id, d]) => ({ id, ...d }));
+      }
+
+      // Objectifs groupe
+      const snapOG = await db.ref('objectifs_config').once('value');
+      const objGroupe = Object.entries(snapOG.val() || {}).map(([id, d]) => ({ id, ...d }));
+
+      const gainsTotaux = actions.filter(a => a.resultat === 'Succès').reduce((s, a) => s + (a.gains_totaux || 0), 0);
+      const actionsTotales = actions.filter(a => a.resultat === 'Succès').length;
+
+      const zoneGroupe = document.getElementById('obj-groupe');
+      if (!objGroupe.length) {
+        zoneGroupe.innerHTML = '<div class="empty-state">Aucun objectif configuré — va dans Admin pour en créer</div>';
+      } else {
+        zoneGroupe.innerHTML = objGroupe.map(o => {
+          const current = o.id === 'gains' ? gainsTotaux : actionsTotales;
+          const pct = Math.min(100, Math.round(current / o.cible * 100));
+          return `<div style="margin-bottom:16px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+              <span>${o.id === 'gains' ? '💰 Gains totaux' : '📋 Actions réussies'}</span>
+              <span style="color:var(--accent)">${current} / ${o.cible} (${pct}%)</span>
+            </div>
+            <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+          </div>`;
+        }).join('');
+      }
+
+      // Objectifs membres
+      const snapOM = await db.ref('objectifs_membres').once('value');
+      const zoneMembres = document.getElementById('obj-membres');
+      let html = '';
+      membres.forEach(m => {
+        const membreActions = actions.filter(a => a.membre_id === m.id && a.resultat === 'Succès').length;
+        const obj = snapOM.val()?.[m.id];
+        const cible = obj?.actions?.cible || 0;
+        if (!cible) return;
+        const pct = Math.min(100, cible ? Math.round(membreActions / cible * 100) : 0);
+        html += `<div style="margin-bottom:16px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+            <span>${m.prenom} ${m.nom} <span class="badge badge-accent">${m.grade}</span></span>
+            <span style="color:var(--accent)">${membreActions} / ${cible} (${pct}%)</span>
+          </div>
+          <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+        </div>`;
+      });
+      zoneMembres.innerHTML = html || '<div class="empty-state">Aucun objectif individuel</div>';
+    }
+
+    load();
+  </script>
+</body>
+</html>

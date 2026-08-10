@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Setup — Vizu 6Block's</title>
+  <style>
+    body { background: #16181c; color: #f2f4f7; font-family: 'Segoe UI', sans-serif; padding: 40px; }
+    .card { background: #1c1f24; border: 1px solid #2a2e35; border-radius: 12px; padding: 30px; max-width: 600px; margin: auto; }
+    h1 { color: #2ea8ff; margin-bottom: 20px; }
+    .btn { background: #2ea8ff; color: #16181c; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 700; font-size: 14px; }
+    .btn:hover { background: #57bfff; }
+    .log { background: #16181c; border: 1px solid #2a2e35; border-radius: 8px; padding: 16px; margin-top: 16px; font-size: 13px; line-height: 1.8; max-height: 400px; overflow-y: auto; }
+    .ok { color: #27ae60; }
+    .err { color: #c0392b; }
+    p { color: #8a939e; margin-bottom: 16px; font-size: 13px; line-height: 1.6; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h1>🔧 Initialisation Firebase</h1>
+  <p>Ce script crée la structure de base dans Firebase (stock vide, actions disponibles, types de taxes). À utiliser <strong>une seule fois</strong>.</p>
+  <button class="btn" onclick="runSetup()">▶ Lancer l'initialisation</button>
+  <div class="log" id="log">En attente...</div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script>
+  const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyCXJPlBL85PkqiuQyLnkjPWnfsAntdydw8",
+    authDomain: "famillejimenez-db887.firebaseapp.com",
+    databaseURL: "https://famillejimenez-db887-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "famillejimenez-db887",
+    storageBucket: "famillejimenez-db887.firebasestorage.app",
+    messagingSenderId: "108342190536",
+    appId: "1:108342190536:web:586acaa60297f9d463e0fd"
+  };
+
+  firebase.initializeApp(FIREBASE_CONFIG);
+  const db = firebase.database();
+
+  const log = document.getElementById('log');
+  function out(msg, type='') {
+    log.innerHTML += `<div class="${type}">${msg}</div>`;
+    log.scrollTop = log.scrollHeight;
+  }
+
+  async function runSetup() {
+    log.innerHTML = '';
+    out('🚀 Démarrage de l\'initialisation...');
+    try {
+      const actions = ['Vente de Drogue','ATM','Cambu','Plantation','Vente de Branches','Braquage','Transport','Autre'];
+      for (const a of actions) {
+        const key = db.ref('actions_dispo').push().key;
+        await db.ref('actions_dispo/' + key).set({ nom: a });
+      }
+      out('✅ Actions disponibles créées', 'ok');
+
+      const cats = [
+        { nom: 'Drogues', emoji: '💊', produits: [
+          { nom: 'Cocaïne', prix: 500, stock: 0, seuil: 10 },
+          { nom: 'Héroïne', prix: 400, stock: 0, seuil: 10 },
+          { nom: 'Cannabis', prix: 150, stock: 0, seuil: 20 },
+          { nom: 'MDMA', prix: 300, stock: 0, seuil: 10 },
+        ]},
+        { nom: 'Matériel', emoji: '🔧', produits: [
+          { nom: 'Boîtier de piratage', prix: 200, stock: 0, seuil: 5 },
+          { nom: 'Outil de crochetage', prix: 150, stock: 0, seuil: 5 },
+        ]},
+        { nom: 'Agriculture', emoji: '🌿', produits: [
+          { nom: 'Eau', prix: 10, stock: 0, seuil: 20 },
+          { nom: 'Fertilisant', prix: 30, stock: 0, seuil: 15 },
+          { nom: 'Graine', prix: 50, stock: 0, seuil: 15 },
+          { nom: 'Pot', prix: 20, stock: 0, seuil: 15 },
+          { nom: 'Branche de cannabis', prix: 100, stock: 0, seuil: 10 },
+        ]},
+      ];
+
+      for (const cat of cats) {
+        const catKey = db.ref('stock').push().key;
+        await db.ref('stock/' + catKey).set({ nom: cat.nom, emoji: cat.emoji });
+        for (const p of cat.produits) {
+          const pKey = db.ref('stock/' + catKey + '/produits').push().key;
+          await db.ref('stock/' + catKey + '/produits/' + pKey).set(p);
+        }
+      }
+      out('✅ Stock initial créé', 'ok');
+
+      const taxes = ['Protection', 'Passage', 'Accord', 'Amende'];
+      for (const t of taxes) {
+        const key = db.ref('types_taxes').push().key;
+        await db.ref('types_taxes/' + key).set({ nom: t, createdAt: Date.now() });
+      }
+      out('✅ Types de taxes créés', 'ok');
+
+      const sKey = db.ref('semaines').push().key;
+      await db.ref('semaines/' + sKey).set({ nom: 'Semaine 1', bloquee: false, createdAt: Date.now() });
+      out('✅ Semaine 1 créée', 'ok');
+
+      out('');
+      out('✅✅ Initialisation terminée !', 'ok');
+      out('→ Va sur pages/admin.html pour créer les membres');
+    } catch(e) {
+      out('❌ Erreur : ' + e.message, 'err');
+    }
+  }
+</script>
+</body>
+</html>

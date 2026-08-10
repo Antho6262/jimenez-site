@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Taxes — Vizu 6Block's</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <div id="sidebar"></div>
+  <div id="main">
+    <div class="page-header">
+      <div class="page-title">💸 <span>Taxes</span></div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-secondary" onclick="openModalType()">+ Type de taxe</button>
+        <button class="btn btn-primary" onclick="openModal()">+ Payer une taxe</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="table-wrapper">
+        <table>
+          <thead><tr>
+            <th>Date</th><th>Groupe</th><th>Taxe</th><th>Montant</th><th>Argent</th><th>Membre</th><th>Notes</th><th></th>
+          </tr></thead>
+          <tbody id="tbody-taxes"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal taxe -->
+  <div class="modal-overlay" id="modal">
+    <div class="modal">
+      <div class="modal-title">Payer une taxe</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Groupe destinataire</label>
+          <input type="text" id="m-groupe" placeholder="Nom du groupe">
+        </div>
+        <div class="form-group">
+          <label>Téléphone (optionnel)</label>
+          <input type="text" id="m-tel" placeholder="555-XXXX">
+        </div>
+        <div class="form-group">
+          <label>Type de taxe</label>
+          <select id="m-taxe"></select>
+        </div>
+        <div class="form-group">
+          <label>Membre responsable</label>
+          <select id="m-membre"></select>
+        </div>
+        <div class="form-group">
+          <label>Montant ($)</label>
+          <input type="number" id="m-montant" value="0" min="0">
+        </div>
+        <div class="form-group">
+          <label>Type d'argent</label>
+          <select id="m-argent">
+            <option value="sale">Argent sale</option>
+            <option value="propre">Argent propre</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Date</label>
+          <input type="date" id="m-date">
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Notes</label>
+          <textarea id="m-notes" rows="2"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal()">Annuler</button>
+        <button class="btn btn-primary" onclick="saveTaxe()">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal nouveau type -->
+  <div class="modal-overlay" id="modal-type">
+    <div class="modal">
+      <div class="modal-title">Nouveau type de taxe</div>
+      <div class="form-group">
+        <label>Nom</label>
+        <input type="text" id="type-nom" placeholder="Ex: Protection">
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModalType()">Annuler</button>
+        <button class="btn btn-primary" onclick="saveType()">Créer</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="../js/firebase-config.js"></script>
+  <script src="../js/app.js"></script>
+  <script>
+    buildSidebar('taxes');
+    let types = [];
+
+    async function init() {
+      await loadTypes();
+      const membres = await getMembres();
+      const sel = document.getElementById('m-membre');
+      membres.forEach(m => sel.innerHTML += `<option value="${m.id}">${m.prenom} ${m.nom}</option>`);
+      document.getElementById('m-date').value = new Date().toISOString().split('T')[0];
+      await loadTaxes();
+    }
+
+    async function loadTypes() {
+      const snap = await db.ref('types_taxes').once('value');
+      types = Object.entries(snap.val() || {}).map(([id, d]) => ({ id, ...d }));
+      types.sort((a, b) => a.nom.localeCompare(b.nom));
+      const sel = document.getElementById('m-taxe');
+      sel.innerHTML = '';
+      types.forEach(t => sel.innerHTML += `<option value="${t.id}">${t.nom}</option>`);
+    }
+
+    async function loadTaxes() {
+      const snap = await db.ref('taxes').once('value');
+      const list = Object.entries(snap.val() || {}).map(([id, d]) => ({ id, ...d }));
+      list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      const tbody = document.getElementById('tbody-taxes');
+      tbody.innerHTML = list.length ? list.map(t => `<tr>
+        <td>${t.date || '-'}</td>
+        <td>${t.groupe || '-'}</td>
+        <td>${t.taxe_nom || '-'}</td>
+        <td style="color:var(--danger)">${formatMoney(t.montant)}</td>
+        <td>${t.type_argent || '-'}</td>
+        <td>${t.prenom_membre || '-'}</td>
+        <td>${t.notes || '-'}</td>
+        <td>${isAdmin() ? `<button class="btn btn-danger btn-sm" onclick="deleteTaxe('${t.id}','${t.type_argent}',${t.montant})">🗑</button>` : ''}</td>
+      </tr>`).join('') : '<tr><td colspan="8"><div class="empty-state">Aucune taxe payée</div></td></tr>';
+    }
+
+    async function saveTaxe() {
+      const groupe = document.getElementById('m-groupe').value;
+      const tel = document.getElementById('m-tel').value;
+      const taxeId = document.getElementById('m-taxe').value;
+      const taxeNom = types.find(t => t.id === taxeId)?.nom || '';
+      const membreId = document.getElementById('m-membre').value;
+      const membres = await getMembres();
+      const membre = membres.find(m => m.id === membreId);
+      const montant = parseFloat(document.getElementById('m-montant').value) || 0;
+      const typeArgent = document.getElementById('m-argent').value;
+      const notes = document.getElementById('m-notes').value;
+      const date = document.getElementById('m-date').value;
+
+      if (!groupe || !montant) { showToast('Groupe et montant obligatoires', 'error'); return; }
+
+      const id = genId();
+      await db.ref('taxes/' + id).set({ groupe, telephone: tel, membre_id: membreId, prenom_membre: membre?.prenom || '', taxe_id: taxeId, taxe_nom: taxeNom, montant, type_argent: typeArgent, notes, date, createdAt: Date.now() });
+      await db.ref('argent/' + typeArgent + '/' + genId()).set({ date, description: 'Taxe ' + taxeNom + ' — ' + groupe, type: 'Sortie', montant, responsable: membre?.prenom || '', createdAt: Date.now() });
+
+      showToast('Taxe enregistrée !');
+      closeModal();
+      await loadTaxes();
+    }
+
+    async function deleteTaxe(id, typeArgent, montant) {
+      if (!confirm2('Supprimer cette taxe ? Le montant sera re-crédité.')) return;
+      await db.ref('taxes/' + id).remove();
+      showToast('Taxe supprimée');
+      await loadTaxes();
+    }
+
+    async function saveType() {
+      const nom = document.getElementById('type-nom').value.trim();
+      if (!nom) return;
+      await db.ref('types_taxes/' + genId()).set({ nom, createdAt: Date.now() });
+      showToast('Type créé !');
+      closeModalType();
+      await loadTypes();
+    }
+
+    function openModal() { document.getElementById('modal').classList.add('show'); }
+    function closeModal() { document.getElementById('modal').classList.remove('show'); }
+    function openModalType() { document.getElementById('modal-type').classList.add('show'); }
+    function closeModalType() { document.getElementById('modal-type').classList.remove('show'); }
+    init();
+  </script>
+</body>
+</html>

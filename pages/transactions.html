@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Transactions — Vizu 6Block's</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <div id="sidebar"></div>
+  <div id="main">
+    <div class="page-header">
+      <div class="page-title">🤝 <span>Transactions</span></div>
+      <button class="btn btn-primary" onclick="openModal()">+ Nouvelle transaction</button>
+    </div>
+
+    <div class="card">
+      <div class="table-wrapper">
+        <table>
+          <thead><tr>
+            <th>Date</th><th>Type</th><th>Groupe</th><th>Produit</th>
+            <th>Quantité</th><th>Prix</th><th>Argent</th><th>Notes</th><th></th>
+          </tr></thead>
+          <tbody id="tbody-trans"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal">
+    <div class="modal">
+      <div class="modal-title">Nouvelle transaction</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Type</label>
+          <select id="m-type">
+            <option value="achat">Achat (on achète)</option>
+            <option value="vente">Vente (on vend)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Groupe</label>
+          <input type="text" id="m-groupe" placeholder="Nom du groupe">
+        </div>
+        <div class="form-group">
+          <label>Téléphone (optionnel)</label>
+          <input type="text" id="m-tel" placeholder="555-XXXX">
+        </div>
+        <div class="form-group">
+          <label>Produit</label>
+          <select id="m-produit"></select>
+        </div>
+        <div class="form-group">
+          <label>Quantité</label>
+          <input type="number" id="m-qte" value="1" min="1">
+        </div>
+        <div class="form-group">
+          <label>Prix total ($)</label>
+          <input type="number" id="m-prix" value="0" min="0">
+        </div>
+        <div class="form-group">
+          <label>Type d'argent</label>
+          <select id="m-argent">
+            <option value="sale">Argent sale</option>
+            <option value="propre">Argent propre</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Date</label>
+          <input type="date" id="m-date">
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Notes</label>
+          <textarea id="m-notes" rows="2" placeholder="Notes..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal()">Annuler</button>
+        <button class="btn btn-primary" onclick="saveTrans()">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="../js/firebase-config.js"></script>
+  <script src="../js/app.js"></script>
+  <script>
+    buildSidebar('transactions');
+    let produits = [];
+
+    async function init() {
+      const snap = await db.ref('stock').once('value');
+      const sel = document.getElementById('m-produit');
+      Object.entries(snap.val() || {}).forEach(([catId, cat]) => {
+        Object.entries(cat.produits || {}).forEach(([pId, p]) => {
+          produits.push({ id: pId, catId, ...p });
+          sel.innerHTML += `<option value="${pId}" data-catid="${catId}">${cat.emoji||''} ${p.nom}</option>`;
+        });
+      });
+      document.getElementById('m-date').value = new Date().toISOString().split('T')[0];
+      await loadTrans();
+    }
+
+    async function loadTrans() {
+      const snap = await db.ref('transactions').once('value');
+      const list = Object.entries(snap.val() || {}).map(([id, d]) => ({ id, ...d }));
+      list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      const tbody = document.getElementById('tbody-trans');
+      tbody.innerHTML = list.length ? list.map(t => `<tr>
+        <td>${t.date || '-'}</td>
+        <td><span class="badge ${t.type === 'achat' ? 'badge-warning' : 'badge-success'}">${t.type === 'achat' ? '⬇ Achat' : '⬆ Vente'}</span></td>
+        <td>${t.groupe || '-'}</td>
+        <td>${t.produit_nom || '-'}</td>
+        <td>${t.quantite || '-'}</td>
+        <td style="color:var(--accent)">${formatMoney(t.prix)}</td>
+        <td>${t.type_argent || '-'}</td>
+        <td>${t.notes || '-'}</td>
+        <td>${isAdmin() ? `<button class="btn btn-danger btn-sm" onclick="deleteTrans('${t.id}',${t.quantite},'${t.produit_id}','${t.catId}','${t.type}','${t.type_argent}',${t.prix})">🗑</button>` : ''}</td>
+      </tr>`).join('') : '<tr><td colspan="9"><div class="empty-state">Aucune transaction</div></td></tr>';
+    }
+
+    async function saveTrans() {
+      const type = document.getElementById('m-type').value;
+      const groupe = document.getElementById('m-groupe').value;
+      const tel = document.getElementById('m-tel').value;
+      const sel = document.getElementById('m-produit');
+      const produitId = sel.value;
+      const produitNom = sel.options[sel.selectedIndex]?.text || '';
+      const catId = sel.options[sel.selectedIndex]?.dataset.catid || '';
+      const qte = parseInt(document.getElementById('m-qte').value) || 1;
+      const prix = parseFloat(document.getElementById('m-prix').value) || 0;
+      const typeArgent = document.getElementById('m-argent').value;
+      const notes = document.getElementById('m-notes').value;
+      const date = document.getElementById('m-date').value;
+      const user = getUser();
+
+      if (!groupe) { showToast('Groupe obligatoire', 'error'); return; }
+
+      const id = genId();
+      await db.ref('transactions/' + id).set({ type, groupe, telephone: tel, produit_id: produitId, produit_nom: produitNom, catId, quantite: qte, prix, type_argent: typeArgent, notes, date, createdAt: Date.now() });
+
+      // Maj stock
+      const pRef = db.ref('stock/' + catId + '/produits/' + produitId + '/stock');
+      const snap = await pRef.once('value');
+      const cur = snap.val() || 0;
+      await pRef.set(type === 'achat' ? cur + qte : Math.max(0, cur - qte));
+
+      // Maj argent
+      const argRef = db.ref('argent/' + typeArgent + '/' + genId());
+      await argRef.set({ date, description: (type === 'achat' ? 'Achat' : 'Vente') + ' — ' + groupe, type: type === 'achat' ? 'Sortie' : 'Entrée', montant: prix, responsable: user?.prenom || '', createdAt: Date.now() });
+
+      showToast('Transaction enregistrée !');
+      closeModal();
+      await loadTrans();
+    }
+
+    async function deleteTrans(id, qte, produitId, catId, type, typeArgent, prix) {
+      if (!confirm2('Supprimer cette transaction ? Le stock et l\'argent seront rollbackés.')) return;
+      // Rollback stock
+      const pRef = db.ref('stock/' + catId + '/produits/' + produitId + '/stock');
+      const snap = await pRef.once('value');
+      const cur = snap.val() || 0;
+      await pRef.set(type === 'achat' ? Math.max(0, cur - qte) : cur + qte);
+      await db.ref('transactions/' + id).remove();
+      showToast('Transaction supprimée');
+      await loadTrans();
+    }
+
+    function openModal() { document.getElementById('modal').classList.add('show'); }
+    function closeModal() { document.getElementById('modal').classList.remove('show'); }
+    init();
+  </script>
+</body>
+</html>

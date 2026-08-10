@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blanchiment — Vizu 6Block's</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <div id="sidebar"></div>
+  <div id="main">
+    <div class="page-header">
+      <div class="page-title">🏦 <span>Blanchiment</span></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
+      <div class="stat-card"><div class="stat-icon">💰</div><div class="stat-value" id="solde-sale">—</div><div class="stat-label">Solde sale disponible</div></div>
+      <div class="stat-card"><div class="stat-icon">🏦</div><div class="stat-value" id="solde-propre">—</div><div class="stat-label">Solde propre total</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Nouveau blanchiment <span style="color:var(--text-muted);font-size:12px;font-weight:400">— Taux : 35% frais → 65% récupéré</span></div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Montant sale à blanchir ($)</label>
+          <input type="number" id="m-montant" min="0" placeholder="10000" oninput="calcul()">
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <input type="text" id="m-desc" placeholder="Ex: Casino, Prête-nom...">
+        </div>
+        <div class="form-group">
+          <label>Date</label>
+          <input type="date" id="m-date">
+        </div>
+      </div>
+      <div class="alert alert-info" style="margin-top:16px" id="calcul-zone">
+        Entrez un montant pour voir le calcul.
+      </div>
+      <div style="margin-top:16px">
+        <button class="btn btn-primary" onclick="saveBlanchiment()">Enregistrer le blanchiment</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Historique</div>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Date</th><th>Description</th><th>Montant sale</th><th>Frais</th><th>Récupéré</th><th>Responsable</th></tr></thead>
+          <tbody id="tbody-blanch"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="../js/firebase-config.js"></script>
+  <script src="../js/app.js"></script>
+  <script>
+    buildSidebar('blanchiment');
+    const TAUX_FRAIS = 0.35;
+
+    async function loadSoldes() {
+      let sale = 0, propre = 0;
+      const s = await db.ref('argent/sale').once('value');
+      Object.values(s.val() || {}).forEach(d => sale += (d.type === 'Entrée' ? 1 : -1) * (d.montant || 0));
+      const p = await db.ref('argent/propre').once('value');
+      Object.values(p.val() || {}).forEach(d => propre += (d.type === 'Entrée' ? 1 : -1) * (d.montant || 0));
+      document.getElementById('solde-sale').textContent = formatMoney(sale);
+      document.getElementById('solde-propre').textContent = formatMoney(propre);
+    }
+
+    function calcul() {
+      const montant = parseFloat(document.getElementById('m-montant').value) || 0;
+      const frais = Math.round(montant * TAUX_FRAIS);
+      const recup = montant - frais;
+      document.getElementById('calcul-zone').innerHTML = `
+        💰 Montant sale : <strong>${formatMoney(montant)}</strong> &nbsp;|&nbsp;
+        📉 Frais (35%) : <strong style="color:var(--danger)">${formatMoney(frais)}</strong> &nbsp;|&nbsp;
+        ✅ Récupéré : <strong style="color:var(--success)">${formatMoney(recup)}</strong>
+      `;
+    }
+
+    async function saveBlanchiment() {
+      const montant = parseFloat(document.getElementById('m-montant').value) || 0;
+      const desc = document.getElementById('m-desc').value || 'Blanchiment';
+      const date = document.getElementById('m-date').value;
+      const user = getUser();
+      if (!montant || montant <= 0) { showToast('Montant invalide', 'error'); return; }
+
+      const frais = Math.round(montant * TAUX_FRAIS);
+      const propre = montant - frais;
+
+      // Sortie argent sale
+      await db.ref('argent/sale/' + genId()).set({ date, description: desc, type: 'Sortie', montant, responsable: user?.prenom || '', createdAt: Date.now() });
+      // Entrée argent propre
+      await db.ref('argent/propre/' + genId()).set({ date, description: desc, type: 'Entrée', montant: propre, responsable: user?.prenom || '', createdAt: Date.now() });
+      // Log blanchiment
+      await db.ref('blanchiments/' + genId()).set({ date, description: desc, montant_sale: montant, montant_propre: propre, frais, responsable: user?.prenom || '', createdAt: Date.now() });
+
+      showToast('Blanchiment enregistré !');
+      document.getElementById('m-montant').value = '';
+      document.getElementById('m-desc').value = '';
+      calcul();
+      await loadSoldes();
+      await loadHistorique();
+    }
+
+    async function loadHistorique() {
+      const snap = await db.ref('blanchiments').once('value');
+      const list = Object.entries(snap.val() || {}).map(([id, d]) => ({ id, ...d }));
+      list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      const tbody = document.getElementById('tbody-blanch');
+      tbody.innerHTML = list.length ? list.map(b => `<tr>
+        <td>${b.date || '-'}</td>
+        <td>${b.description || '-'}</td>
+        <td style="color:var(--danger)">${formatMoney(b.montant_sale)}</td>
+        <td>${formatMoney(b.frais)}</td>
+        <td style="color:var(--success)">${formatMoney(b.montant_propre)}</td>
+        <td>${b.responsable || '-'}</td>
+      </tr>`).join('') : '<tr><td colspan="6"><div class="empty-state">Aucun blanchiment</div></td></tr>';
+    }
+
+    const now = new Date();
+    document.getElementById('m-date').value = now.toISOString().split('T')[0];
+    loadSoldes();
+    loadHistorique();
+  </script>
+</body>
+</html>

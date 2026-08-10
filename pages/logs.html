@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Logs Discord — Vizu 6Block's</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <div id="sidebar"></div>
+  <div id="main">
+    <div class="page-header">
+      <div class="page-title">📜 <span>Logs Discord</span></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Parser les logs du bot</div>
+      <p style="color:var(--text-muted);font-size:13px;margin-bottom:12px">
+        Colle les logs du bot Spidey BotAPP ci-dessous.<br>
+        Format attendu : <code style="background:var(--bg-main);padding:2px 6px;border-radius:4px">Prénom Nom a retiré/déposé Nx Produit</code>
+      </p>
+      <div class="form-group" style="margin-bottom:12px">
+        <textarea id="logs-input" rows="10" placeholder="Colle les logs ici...&#10;&#10;Exemple :&#10;Tony Diaz a retiré 5x Cocaïne&#10;Elvira Santos a déposé 10x Cannabis"></textarea>
+      </div>
+      <button class="btn btn-primary" onclick="parseLogs()">📥 Importer et mettre à jour le stock</button>
+    </div>
+
+    <div class="card" id="result-card" style="display:none">
+      <div class="card-title">Résultat de l'import</div>
+      <div id="result-zone"></div>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="../js/firebase-config.js"></script>
+  <script src="../js/app.js"></script>
+  <script>
+    buildSidebar('logs');
+
+    async function parseLogs() {
+      const text = document.getElementById('logs-input').value.trim();
+      if (!text) { showToast('Rien à importer', 'error'); return; }
+
+      // Charger le stock
+      const snapStock = await db.ref('stock').once('value');
+      const stockData = snapStock.val() || {};
+
+      const lines = text.split('\n').filter(l => l.trim());
+      const results = [];
+
+      for (const line of lines) {
+        const matchRetrait = line.match(/(.+?) a retiré (\d+)x (.+)/i);
+        const matchDepot = line.match(/(.+?) a déposé (\d+)x (.+)/i);
+        const match = matchRetrait || matchDepot;
+        if (!match) { results.push({ line, status: 'ignoré', msg: 'Format non reconnu' }); continue; }
+
+        const membre = match[1].trim();
+        const qte = parseInt(match[2]);
+        const produitNom = match[3].trim();
+        const isRetrait = !!matchRetrait;
+
+        // Chercher le produit dans le stock
+        let found = false;
+        for (const [catId, cat] of Object.entries(stockData)) {
+          for (const [pId, p] of Object.entries(cat.produits || {})) {
+            if (p.nom.toLowerCase() === produitNom.toLowerCase()) {
+              const newStock = isRetrait ? Math.max(0, (p.stock || 0) - qte) : (p.stock || 0) + qte;
+              await db.ref('stock/' + catId + '/produits/' + pId + '/stock').set(newStock);
+              stockData[catId].produits[pId].stock = newStock;
+              results.push({ line, status: 'ok', msg: `${produitNom}: ${isRetrait ? '-' : '+'}${qte} → ${newStock}` });
+              found = true;
+              break;
+            }
+          }
+          if (found) break;
+        }
+        if (!found) results.push({ line, status: 'erreur', msg: `Produit "${produitNom}" non trouvé dans le stock` });
+      }
+
+      // Afficher résultats
+      document.getElementById('result-card').style.display = 'block';
+      document.getElementById('result-zone').innerHTML = results.map(r => `
+        <div class="alert ${r.status === 'ok' ? 'alert-success' : r.status === 'erreur' ? 'alert-danger' : 'alert-warning'}">
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:2px">${r.line}</div>
+          ${r.msg}
+        </div>
+      `).join('');
+      showToast('Import terminé !');
+    }
+  </script>
+</body>
+</html>

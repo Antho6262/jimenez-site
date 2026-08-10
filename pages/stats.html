@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Statistiques — Vizu 6Block's</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <div id="sidebar"></div>
+  <div id="main">
+    <div class="page-header">
+      <div class="page-title">📊 <span>Statistiques</span></div>
+      <select id="sel-semaine" onchange="loadStats()"></select>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-value" id="s-total">—</div><div class="stat-label">Total actions</div></div>
+      <div class="stat-card"><div class="stat-icon">✅</div><div class="stat-value" id="s-reussi">—</div><div class="stat-label">Réussies</div></div>
+      <div class="stat-card"><div class="stat-icon">❌</div><div class="stat-value" id="s-echoue">—</div><div class="stat-label">Échouées</div></div>
+      <div class="stat-card"><div class="stat-icon">📈</div><div class="stat-value" id="s-taux">—</div><div class="stat-label">Taux réussite</div></div>
+      <div class="stat-card"><div class="stat-icon">💰</div><div class="stat-value" id="s-gains-sale">—</div><div class="stat-label">Gains sale</div></div>
+      <div class="stat-card"><div class="stat-icon">🏦</div><div class="stat-value" id="s-gains-propre">—</div><div class="stat-label">Gains propre</div></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+      <div class="card">
+        <div class="card-title">👥 Stats par membre</div>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>Membre</th><th>Total</th><th>Réussies</th><th>Gains</th></tr></thead>
+            <tbody id="stats-membres"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">🎯 Stats par action</div>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>Action</th><th>Nb</th><th>Réussies</th><th>Taux</th></tr></thead>
+            <tbody id="stats-actions"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="../js/firebase-config.js"></script>
+  <script src="../js/app.js"></script>
+  <script>
+    buildSidebar('stats');
+
+    async function init() {
+      const snap = await db.ref('semaines').once('value');
+      const sel = document.getElementById('sel-semaine');
+      const semaines = [];
+      Object.entries(snap.val() || {}).forEach(([id, d]) => semaines.push({ id, ...d }));
+      semaines.reverse().forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.id;
+        opt.textContent = s.nom + (s.bloquee ? ' (clôturée)' : ' ✦');
+        sel.appendChild(opt);
+      });
+      await loadStats();
+    }
+
+    async function loadStats() {
+      const sId = document.getElementById('sel-semaine').value;
+      if (!sId) return;
+      const snap = await db.ref('actions/' + sId).once('value');
+      const actions = Object.entries(snap.val() || {}).map(([id, d]) => ({ id, ...d }));
+
+      const total = actions.length;
+      const reussi = actions.filter(a => a.resultat === 'Succès').length;
+      const echoue = total - reussi;
+      const taux = total ? Math.round(reussi / total * 100) : 0;
+      let gainsSale = 0, gainsPropre = 0;
+      actions.forEach(a => { gainsSale += a.argent_sale || 0; gainsPropre += a.argent_propre || 0; });
+
+      document.getElementById('s-total').textContent = total;
+      document.getElementById('s-reussi').textContent = reussi;
+      document.getElementById('s-echoue').textContent = echoue;
+      document.getElementById('s-taux').textContent = taux + '%';
+      document.getElementById('s-gains-sale').textContent = formatMoney(gainsSale);
+      document.getElementById('s-gains-propre').textContent = formatMoney(gainsPropre);
+
+      // Par membre
+      const byMembre = {};
+      actions.forEach(a => {
+        if (!byMembre[a.membre_id]) byMembre[a.membre_id] = { nom: (a.prenom_membre || '') + ' ' + (a.nom_membre || ''), total: 0, reussi: 0, gains: 0 };
+        byMembre[a.membre_id].total++;
+        if (a.resultat === 'Succès') { byMembre[a.membre_id].reussi++; byMembre[a.membre_id].gains += a.gains_totaux || 0; }
+      });
+      const sorted = Object.values(byMembre).sort((a, b) => b.gains - a.gains);
+      document.getElementById('stats-membres').innerHTML = sorted.length
+        ? sorted.map(m => `<tr><td>${m.nom}</td><td>${m.total}</td><td>${m.reussi}</td><td style="color:var(--accent)">${formatMoney(m.gains)}</td></tr>`).join('')
+        : '<tr><td colspan="4"><div class="empty-state">Pas de données</div></td></tr>';
+
+      // Par action
+      const byAction = {};
+      actions.forEach(a => {
+        if (!byAction[a.action]) byAction[a.action] = { total: 0, reussi: 0 };
+        byAction[a.action].total++;
+        if (a.resultat === 'Succès') byAction[a.action].reussi++;
+      });
+      const sortedA = Object.entries(byAction).sort((a, b) => b[1].total - a[1].total);
+      document.getElementById('stats-actions').innerHTML = sortedA.length
+        ? sortedA.map(([nom, d]) => `<tr>
+            <td>${nom}</td><td>${d.total}</td><td>${d.reussi}</td>
+            <td>${Math.round(d.reussi/d.total*100)}%</td>
+          </tr>`).join('')
+        : '<tr><td colspan="4"><div class="empty-state">Pas de données</div></td></tr>';
+    }
+
+    init();
+  </script>
+</body>
+</html>

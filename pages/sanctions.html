@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sanctions — Vizu 6Block's</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <div id="sidebar"></div>
+  <div id="main">
+    <div class="page-header">
+      <div class="page-title">⚠️ <span>Sanctions</span></div>
+      <button class="btn btn-primary" onclick="openModal()">+ Nouvelle sanction</button>
+    </div>
+
+    <div class="card">
+      <div class="table-wrapper">
+        <table>
+          <thead><tr>
+            <th>Date</th><th>Membre</th><th>Niveau</th><th>Motif</th><th>Par</th><th></th>
+          </tr></thead>
+          <tbody id="tbody-sanctions"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal">
+    <div class="modal">
+      <div class="modal-title">Nouvelle sanction</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Membre sanctionné</label>
+          <select id="m-membre"></select>
+        </div>
+        <div class="form-group">
+          <label>Niveau</label>
+          <select id="m-niveau">
+            <option value="1">1 — Avertissement</option>
+            <option value="2">2 — Blâme</option>
+            <option value="3">3 — Suspension</option>
+            <option value="4">4 — Exclusion</option>
+          </select>
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Motif</label>
+          <textarea id="m-motif" rows="3" placeholder="Décris la raison de la sanction..."></textarea>
+        </div>
+        <div class="form-group">
+          <label>Date</label>
+          <input type="date" id="m-date">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal()">Annuler</button>
+        <button class="btn btn-primary" onclick="saveSanction()">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="../js/firebase-config.js"></script>
+  <script src="../js/app.js"></script>
+  <script>
+    buildSidebar('sanctions');
+    let membres = [];
+
+    const NIVEAUX = { '1': '⚡ Avertissement', '2': '🔴 Blâme', '3': '🚫 Suspension', '4': '💀 Exclusion' };
+    const BADGES = { '1': 'badge-warning', '2': 'badge-danger', '3': 'badge-danger', '4': 'badge-danger' };
+
+    async function init() {
+      membres = await getMembres();
+      const sel = document.getElementById('m-membre');
+      membres.forEach(m => sel.innerHTML += `<option value="${m.id}">${m.prenom} ${m.nom}</option>`);
+      document.getElementById('m-date').value = new Date().toISOString().split('T')[0];
+      await loadSanctions();
+    }
+
+    async function loadSanctions() {
+      const snap = await db.ref('sanctions').once('value');
+      const list = Object.entries(snap.val() || {}).map(([id, d]) => ({ id, ...d }));
+      list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      const tbody = document.getElementById('tbody-sanctions');
+      tbody.innerHTML = list.length ? list.map(s => `<tr>
+        <td>${s.date || '-'}</td>
+        <td>${s.prenom || ''} ${s.nom || ''}</td>
+        <td><span class="badge ${BADGES[s.niveau] || 'badge-warning'}">${NIVEAUX[s.niveau] || 'N' + s.niveau}</span></td>
+        <td>${s.motif || '-'}</td>
+        <td>${s.par || '-'}</td>
+        <td>${isAdmin() ? `<button class="btn btn-danger btn-sm" onclick="del('${s.id}')">🗑</button>` : ''}</td>
+      </tr>`).join('') : '<tr><td colspan="6"><div class="empty-state">Aucune sanction</div></td></tr>';
+    }
+
+    async function saveSanction() {
+      const membreId = document.getElementById('m-membre').value;
+      const niveau = document.getElementById('m-niveau').value;
+      const motif = document.getElementById('m-motif').value;
+      const date = document.getElementById('m-date').value;
+      const user = getUser();
+      const membre = membres.find(m => m.id === membreId);
+
+      if (!motif) { showToast('Motif obligatoire', 'error'); return; }
+
+      await db.ref('sanctions/' + genId()).set({ membre_id: membreId, prenom: membre?.prenom || '', nom: membre?.nom || '', niveau, motif, par: user?.prenom || '', date, createdAt: Date.now() });
+      showToast('Sanction enregistrée');
+      closeModal();
+      await loadSanctions();
+    }
+
+    async function del(id) {
+      if (!confirm2('Supprimer cette sanction ?')) return;
+      await db.ref('sanctions/' + id).remove();
+      showToast('Supprimée');
+      await loadSanctions();
+    }
+
+    function openModal() { document.getElementById('modal').classList.add('show'); }
+    function closeModal() { document.getElementById('modal').classList.remove('show'); }
+    init();
+  </script>
+</body>
+</html>
