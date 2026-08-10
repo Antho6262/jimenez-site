@@ -13,23 +13,9 @@ const FIREBASE_CONFIG = {
 firebase.initializeApp(FIREBASE_CONFIG);
 const db = firebase.database();
 
-const GRADES = [
-  "Fondateur",
-  "Lead",
-  "Co-Lead",
-  "Bras droit",
-  "Gadjo",
-  "Comis"
-];
+const GRADES = [];
 
-const PERMS_DEFAUT = {
-  "Fondateur":  ["dashboard","tracker","stats","stock","logs","quotas","objectifs","blanchiment","sanctions","admin","profil","tv","transactions","taxes"],
-  "Lead":       ["dashboard","tracker","stats","stock","logs","quotas","objectifs","blanchiment","sanctions","admin","profil","tv","transactions","taxes"],
-  "Co-Lead":    ["dashboard","tracker","stats","stock","logs","quotas","objectifs","blanchiment","sanctions","admin","profil","tv","transactions","taxes"],
-  "Bras droit": ["dashboard","tracker","stats","quotas","objectifs","sanctions","profil","transactions","taxes"],
-  "Gadjo":      ["dashboard","tracker","stats","quotas","objectifs","sanctions","profil","transactions","taxes"],
-  "Comis":      ["dashboard","tracker","stats","quotas","objectifs","sanctions","profil","transactions","taxes"]
-};
+const PERMS_DEFAUT = {};
 
 async function canAccess(page) {
   const user = JSON.parse(sessionStorage.getItem('jimenez_user') || 'null');
