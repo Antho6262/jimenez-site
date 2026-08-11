@@ -20,10 +20,10 @@ const NAV_ITEMS = [
 
 // Couleurs grades (dynamique selon GRADES)
 const GRADE_COLORS = {
-  'Fondateur':   '#2ea8ff',
-  'Lead':        '#57bfff',
+  'Fondateur':   '#ff7a1a',
+  'Lead':        '#ffa04d',
   'Co-Lead':     '#c0c0c0',
-  'Bras droit':  '#7fd0ff',
+  'Bras droit':  '#ffbf80',
   'Gadjo':       '#a0a0a0',
   'Comis':       '#707070',
 };
@@ -82,7 +82,7 @@ async function buildSidebar(currentPage) {
 
   sidebar.innerHTML = `
     <div class="sidebar-header">
-      <div class="sidebar-logo">V6</div>
+      <img src="../img/groupe.jpg" class="sidebar-logo" alt="Vizu 6Block's">
       <div class="sidebar-title">Vizu<br><span>6Block's</span></div>
     </div>
     <div class="sidebar-user">

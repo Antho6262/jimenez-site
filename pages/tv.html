@@ -20,9 +20,9 @@
       justify-content: space-between;
       padding: 12px 24px;
       background: #1c1f24;
-      border-bottom: 2px solid #2ea8ff;
+      border-bottom: 2px solid #ff7a1a;
     }
-    .tv-title { font-size: 20px; font-weight: 800; color: #2ea8ff; }
+    .tv-title { font-size: 20px; font-weight: 800; color: #ff7a1a; }
     .tv-semaine { font-size: 13px; color: #8a939e; }
     .tv-time { font-size: 22px; font-weight: 700; color: #f2f4f7; }
     .tv-grid {
@@ -42,7 +42,7 @@
     .tv-card-title {
       font-size: 13px;
       font-weight: 700;
-      color: #2ea8ff;
+      color: #ff7a1a;
       text-transform: uppercase;
       letter-spacing: 1px;
       margin-bottom: 12px;
@@ -55,12 +55,12 @@
     .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
     .ok { background: #27ae6020; color: #2ecc71; border: 1px solid #27ae6040; }
     .ko { background: #c0392b20; color: #e74c3c; border: 1px solid #c0392b40; }
-    .acc { background: #2ea8ff20; color: #2ea8ff; border: 1px solid #2ea8ff40; }
+    .acc { background: #ff7a1a20; color: #ff7a1a; border: 1px solid #ff7a1a40; }
     .ticker {
       position: fixed;
       bottom: 0;
       left: 0; right: 0;
-      background: #2ea8ff;
+      background: #ff7a1a;
       color: #16181c;
       font-size: 13px;
       font-weight: 700;
@@ -112,7 +112,7 @@
         <div style="display:flex;gap:16px;margin-top:8px">
           <div style="flex:1;text-align:center">
             <div style="font-size:10px;color:#8a939e;text-transform:uppercase">Sale</div>
-            <div style="font-size:18px;font-weight:700;color:#2ea8ff" id="tv-sale">—</div>
+            <div style="font-size:18px;font-weight:700;color:#ff7a1a" id="tv-sale">—</div>
           </div>
           <div style="flex:1;text-align:center">
             <div style="font-size:10px;color:#8a939e;text-transform:uppercase">Propre</div>
@@ -167,7 +167,7 @@
       document.getElementById('tv-classement').innerHTML = cl.slice(0, 8).map((m, i) => `<tr>
         <td class="${i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : ''}">${i + 1}</td>
         <td>${m.nom}</td><td>${m.total}</td>
-        <td style="color:#2ea8ff">${m.gains.toLocaleString('fr-FR')} $</td>
+        <td style="color:#ff7a1a">${m.gains.toLocaleString('fr-FR')} $</td>
       </tr>`).join('') || '<tr><td colspan="4" style="text-align:center;color:#8a939e">Aucune action</td></tr>';
 
       // Dernières actions

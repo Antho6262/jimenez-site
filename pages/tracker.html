@@ -42,7 +42,7 @@
   <!-- Modal nouvelle action -->
   <div class="modal-overlay" id="modal">
     <div class="modal" style="max-width:600px">
-      <div class="modal-title">➕ Nouvelle action</div>
+      <div class="modal-title" id="modal-title">➕ Nouvelle action</div>
       <div class="form-grid">
         <div class="form-group">
           <label>Membre</label>
@@ -94,7 +94,7 @@
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick="closeModal()">Annuler</button>
-        <button class="btn btn-primary" onclick="saveAction()">Enregistrer</button>
+        <button class="btn btn-primary" id="btn-save-action" onclick="saveAction()">Enregistrer</button>
       </div>
     </div>
   </div>
@@ -107,6 +107,7 @@
     buildSidebar('tracker');
     let semaine = null;
     let allActions = [];
+    let editingId = null;
     let membres = [];
     let actionsDispo = [];
     let drogueProduits = [];
@@ -195,7 +196,7 @@
       const fA = document.getElementById('f-action').value;
       const fR = document.getElementById('f-resultat').value;
       const user = Auth.membre;
-      const canDel = user && (user.grade === 'Fondateur' || user.grade === 'Lead' || user.grade === 'Co-Lead' || user.role === 'admin');
+      const isAdminUser = user && (user.grade === 'Fondateur' || user.grade === 'Lead' || user.grade === 'Co-Lead' || user.role === 'admin');
 
       const filtered = allActions.filter(a =>
         (!fM || a.membre_id === fM) &&
@@ -208,7 +209,9 @@
         tbody.innerHTML = '<tr><td colspan="10"><div class="empty-state"><div class="empty-icon">📋</div>Aucune action trouvée</div></td></tr>';
         return;
       }
-      tbody.innerHTML = filtered.map(a => `<tr>
+      tbody.innerHTML = filtered.map(a => {
+        const canManage = user && (isAdminUser || a.membre_id === user.id);
+        return `<tr>
         <td style="color:var(--text-muted)">${a.date || '-'}</td>
         <td style="color:var(--text-muted)">${a.heure || '-'}</td>
         <td><strong>${a.prenom_membre || '-'}</strong>${a.prenom_membre2 ? ' + ' + a.prenom_membre2 : ''}</td>
@@ -218,8 +221,9 @@
         <td><span class="badge ${a.resultat === 'Succès' ? 'badge-success' : 'badge-danger'}">${a.resultat || '-'}</span></td>
         <td style="font-size:11px;color:#e07070">${a.resultat === 'Échec' && a.raison_echec ? a.raison_echec : '—'}</td>
         <td style="color:var(--accent);font-weight:600">${a.gains_totaux > 0 ? Utils.fmt(a.gains_totaux) : '—'}</td>
-        <td>${canDel ? `<button class="btn btn-danger btn-sm" onclick="deleteAction('${a.id}')" title="Supprimer cette action">🗑</button>` : ''}</td>
-      </tr>`).join('');
+        <td>${canManage ? `<button class="btn btn-secondary btn-sm" onclick="openEditModal('${a.id}')" title="Modifier cette action">✏️</button> <button class="btn btn-danger btn-sm" onclick="deleteAction('${a.id}')" title="Supprimer cette action">🗑</button>` : ''}</td>
+      </tr>`;
+      }).join('');
     }
 
     async function saveAction() {
@@ -248,6 +252,35 @@
         produitId = sel.value;
         produitNom = sel.options[sel.selectedIndex]?.text || '';
         produitCatId = sel.options[sel.selectedIndex]?.dataset?.catid || '';
+      }
+
+      // --- Mode édition : mise à jour de l'action existante uniquement ---
+      if (editingId) {
+        const user = Auth.membre;
+        const isAdminUser = user && (user.grade === 'Fondateur' || user.grade === 'Lead' || user.grade === 'Co-Lead' || user.role === 'admin');
+        const existing = allActions.find(x => x.id === editingId);
+        if (!existing || !user || !(isAdminUser || existing.membre_id === user.id)) {
+          Utils.toast('Action non autorisée', 'error'); return;
+        }
+        await db.ref('actions/' + semaine.id + '/' + editingId).update({
+          membre_id: membreId,
+          prenom_membre: membre?.prenom || '',
+          nom_membre: membre?.nom || '',
+          grade_membre: membre?.grade || '',
+          prenom_membre2: membre2?.prenom || '',
+          action, quantite: qte, date, heure, resultat,
+          raison_echec: raison,
+          produit_drogue: produitNom,
+          produit_drogue_id: produitId,
+          argent_sale: argSale,
+          argent_propre: argPropre,
+          gains_totaux: argSale + argPropre,
+        });
+        Utils.toast('Action mise à jour ! (stock et argent déjà comptabilisés inchangés)');
+        editingId = null;
+        closeModal();
+        await loadActions();
+        return;
       }
 
       const id = genId();
@@ -314,13 +347,51 @@
     }
 
     async function deleteAction(id) {
+      const a = allActions.find(x => x.id === id);
+      const user = Auth.membre;
+      const isAdminUser = user && (user.grade === 'Fondateur' || user.grade === 'Lead' || user.grade === 'Co-Lead' || user.role === 'admin');
+      if (!a || !user || !(isAdminUser || a.membre_id === user.id)) { Utils.toast('Action non autorisée', 'error'); return; }
       if (!confirm('Supprimer cette action ?')) return;
       await db.ref('actions/' + semaine.id + '/' + id).remove();
       Utils.toast('Action supprimée');
       await loadActions();
     }
 
-    function openModal() { document.getElementById('modal').classList.add('show'); }
+    function openModal() {
+      editingId = null;
+      document.getElementById('modal-title').textContent = '➕ Nouvelle action';
+      document.getElementById('btn-save-action').textContent = 'Enregistrer';
+      document.getElementById('modal').classList.add('show');
+    }
+
+    function openEditModal(id) {
+      const a = allActions.find(x => x.id === id);
+      if (!a) return;
+      const user = Auth.membre;
+      const isAdminUser = user && (user.grade === 'Fondateur' || user.grade === 'Lead' || user.grade === 'Co-Lead' || user.role === 'admin');
+      if (!user || !(isAdminUser || a.membre_id === user.id)) { Utils.toast('Action non autorisée', 'error'); return; }
+
+      editingId = id;
+      document.getElementById('modal-title').textContent = '✏️ Modifier l\'action';
+      document.getElementById('btn-save-action').textContent = 'Mettre à jour';
+
+      document.getElementById('m-membre').value = a.membre_id || '';
+      document.getElementById('m-membre2').value = membres.find(m => m.prenom === a.prenom_membre2)?.id || '';
+      document.getElementById('m-action').value = a.action || '';
+      onActionChange();
+      if (a.produit_drogue_id) document.getElementById('m-produit').value = a.produit_drogue_id;
+      document.getElementById('m-qte').value = a.quantite || 1;
+      document.getElementById('m-resultat').value = a.resultat || 'Succès';
+      onResultatChange();
+      document.getElementById('m-raison').value = a.raison_echec || '';
+      document.getElementById('m-argent-sale').value = a.argent_sale || 0;
+      document.getElementById('m-argent-propre').value = a.argent_propre || 0;
+      document.getElementById('m-date').value = a.date || '';
+      document.getElementById('m-heure').value = a.heure || '';
+
+      document.getElementById('modal').classList.add('show');
+    }
+
     function closeModal() { document.getElementById('modal').classList.remove('show'); }
 
     document.getElementById('f-membre').addEventListener('change', renderActions);
