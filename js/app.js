@@ -42,10 +42,14 @@ const Auth = {
     sessionStorage.removeItem('jimenez_user');
     window.location.href = '../index.html';
   },
-  canAccess(page) {
+  async canAccess(page) {
     const u = this.membre;
     if (!u) return false;
     if (u.role === 'admin') return true;
+    try {
+      const snap = await db.ref('permissions/' + u.grade + '/' + page).once('value');
+      if (snap.exists()) return snap.val() === true;
+    } catch (e) {}
     const perms = PERMS_DEFAUT[u.grade] || PERMS_DEFAUT['Comis'] || [];
     return perms.includes(page);
   }
@@ -72,7 +76,7 @@ async function buildSidebar(currentPage) {
 
   let navHTML = '';
   for (const item of NAV_ITEMS) {
-    if (!Auth.canAccess(item.page)) continue;
+    if (!(await Auth.canAccess(item.page))) continue;
     const active = item.page === currentPage ? 'active' : '';
     navHTML += `<a href="${item.file}" class="nav-item ${active}">
       <span class="nav-icon">${item.icon}</span>
