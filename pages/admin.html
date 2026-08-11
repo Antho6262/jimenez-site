@@ -275,8 +275,10 @@
 
     const PAGES_DISPO = ['dashboard','tracker','stats','stock','quotas','objectifs','blanchiment','sanctions','admin','profil','tv','transactions','taxes'];
 
-    GRADES.forEach(g => {
-      document.getElementById('m-grade').innerHTML += `<option value="${g}">${g}</option>`;
+    GRADES_READY.then(() => {
+      GRADES.forEach(g => {
+        document.getElementById('m-grade').innerHTML += `<option value="${g}">${g}</option>`;
+      });
     });
 
     function switchTab(tab, el) {

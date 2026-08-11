@@ -44,7 +44,7 @@ function logout() {
 }
 
 // Charger les grades depuis Firebase (écrase le tableau GRADES si présent)
-db.ref('grades').once('value').then(snap => {
+const GRADES_READY = db.ref('grades').once('value').then(snap => {
   if (snap.exists()) {
     GRADES.length = 0;
     snap.val().forEach(g => GRADES.push(g));
