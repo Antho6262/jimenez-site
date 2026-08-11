@@ -18,7 +18,8 @@
     <div class="stats-grid" id="stats-grid">
       <div class="stat-card"><div class="stat-icon">💰</div><div class="stat-value" id="s-sale">—</div><div class="stat-label">Argent Sale</div></div>
       <div class="stat-card"><div class="stat-icon">🏦</div><div class="stat-value" id="s-propre">—</div><div class="stat-label">Argent Propre</div></div>
-      <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-value" id="s-actions">—</div><div class="stat-label">Actions semaine</div></div>
+      <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-value" id="s-actions">—</div><div class="stat-label">Actions (hors drogue)</div></div>
+      <div class="stat-card"><div class="stat-icon">💊</div><div class="stat-value" id="s-drogue">—</div><div class="stat-label">Ventes de drogue</div></div>
       <div class="stat-card"><div class="stat-icon">✅</div><div class="stat-value" id="s-reussi">—</div><div class="stat-label">Réussies</div></div>
       <div class="stat-card"><div class="stat-icon">❌</div><div class="stat-value" id="s-echoue">—</div><div class="stat-label">Échouées</div></div>
       <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-value" id="s-membres">—</div><div class="stat-label">Membres actifs</div></div>
@@ -80,7 +81,8 @@
       if (semaine) {
         const snapA = await db.ref('actions/' + semaine.id).once('value');
         const actions = Object.entries(snapA.val() || {}).map(([id, d]) => ({ id, ...d }));
-        document.getElementById('s-actions').textContent = actions.length;
+        document.getElementById('s-actions').textContent = actions.filter(a => a.action !== 'Vente de Drogue').length;
+        document.getElementById('s-drogue').textContent = actions.filter(a => a.action === 'Vente de Drogue').length;
         document.getElementById('s-reussi').textContent = actions.filter(a => a.resultat === 'Succès').length;
         document.getElementById('s-echoue').textContent = actions.filter(a => a.resultat === 'Échec').length;
 
