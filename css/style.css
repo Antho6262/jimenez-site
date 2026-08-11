@@ -8,16 +8,16 @@
   --bg-card: #1c1f24;
   --bg-card2: #22262c;
   --bg-sidebar: #131519;
-  --accent: #2ea8ff;
-  --accent2: #57bfff;
-  --accent-dark: #1a75c4;
+  --accent: #ff7a1a;
+  --accent2: #ffa04d;
+  --accent-dark: #c4570a;
   --danger: #c0392b;
   --success: #27ae60;
   --warning: #f39c12;
   --text: #f2f4f7;
   --text-muted: #8a939e;
   --border: #2a2e35;
-  --border-accent: #2ea8ff44;
+  --border-accent: #ff7a1a44;
   --shadow: 0 4px 20px rgba(0,0,0,0.5);
 }
 
@@ -33,7 +33,7 @@ body {
   position: relative;
 }
 
-/* Fond urbain : photo du groupe assombrie */
+/* Fond urbain : texture béton + grille néon, remplace le logo */
 body::before {
   content: '';
   position: fixed;
@@ -79,13 +79,8 @@ body::before {
   border: 2px solid var(--accent);
   box-shadow: 0 0 10px var(--border-accent);
   flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  font-weight: 800;
-  color: var(--accent);
-  background: var(--bg-sidebar);
+  object-fit: cover;
+  object-position: center 20%;
 }
 
 .sidebar-title {
@@ -265,7 +260,7 @@ select option { background: var(--bg-main); }
 .badge-success { background: #27ae6020; color: var(--success); border: 1px solid #27ae6040; }
 .badge-danger  { background: #c0392b20; color: var(--danger);  border: 1px solid #c0392b40; }
 .badge-warning { background: #f39c1220; color: var(--warning); border: 1px solid #f39c1240; }
-.badge-accent  { background: #2ea8ff20; color: var(--accent);  border: 1px solid #2ea8ff40; }
+.badge-accent  { background: #ff7a1a20; color: var(--accent);  border: 1px solid #ff7a1a40; }
 
 /* =============================================
    MODALES
@@ -304,7 +299,7 @@ select option { background: var(--bg-main); }
 .alert-danger  { background: #c0392b15; border: 1px solid #c0392b40; color: #e74c3c; }
 .alert-warning { background: #f39c1215; border: 1px solid #f39c1240; color: #f39c12; }
 .alert-success { background: #27ae6015; border: 1px solid #27ae6040; color: #2ecc71; }
-.alert-info    { background: #2ea8ff15; border: 1px solid #2ea8ff40; color: var(--accent); }
+.alert-info    { background: #ff7a1a15; border: 1px solid #ff7a1a40; color: var(--accent); }
 
 /* =============================================
    PROGRESS BAR

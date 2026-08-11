@@ -29,26 +29,21 @@
       border-radius: 16px;
       padding: 40px;
       width: 380px;
-      box-shadow: 0 8px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(46,168,255,0.08);
+      box-shadow: 0 8px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,122,26,0.12);
     }
     .login-logo {
       text-align: center;
       margin-bottom: 28px;
     }
     .login-logo .monogram {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
+      display: inline-block;
       width: 90px;
       height: 90px;
       border-radius: 50%;
-      background: #16181c;
-      border: 2px solid #2ea8ff;
-      box-shadow: 0 0 20px rgba(46,168,255,0.35);
-      color: #2ea8ff;
-      font-size: 30px;
-      font-weight: 800;
-      letter-spacing: -1px;
+      border: 2px solid #ff7a1a;
+      box-shadow: 0 0 20px rgba(255,122,26,0.35);
+      object-fit: cover;
+      object-position: center 20%;
     }
     .login-title {
       text-align: center;
@@ -60,7 +55,7 @@
     .login-subtitle {
       text-align: center;
       font-size: 13px;
-      color: #2ea8ff;
+      color: #ff7a1a;
       margin-bottom: 28px;
     }
     .form-group { margin-bottom: 16px; }
@@ -84,11 +79,11 @@
       outline: none;
       transition: border-color 0.15s;
     }
-    select:focus, input:focus { border-color: #2ea8ff; }
+    select:focus, input:focus { border-color: #ff7a1a; }
     select option { background: #16181c; }
     .btn-login {
       width: 100%;
-      background: #2ea8ff;
+      background: #ff7a1a;
       color: #16181c;
       border: none;
       border-radius: 8px;
@@ -99,7 +94,7 @@
       margin-top: 8px;
       transition: background 0.15s;
     }
-    .btn-login:hover { background: #57bfff; }
+    .btn-login:hover { background: #ffa04d; }
     .error {
       background: #c0392b15;
       border: 1px solid #c0392b40;
@@ -117,7 +112,7 @@
   <div class="login-bg"></div>
   <div class="login-box">
     <div class="login-logo">
-      <div class="monogram">V6</div>
+      <img src="img/groupe.jpg" alt="Vizu 6Block's" class="monogram">
     </div>
     <div class="login-title">Vizu 6Block's</div>
     <div class="login-subtitle">Espace privé — Accès réservé aux membres</div>
