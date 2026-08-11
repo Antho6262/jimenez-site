@@ -17,18 +17,6 @@ const GRADES = [];
 
 const PERMS_DEFAUT = {};
 
-async function canAccess(page) {
-  const user = JSON.parse(sessionStorage.getItem('jimenez_user') || 'null');
-  if (!user) return false;
-  if (user.role === 'admin') return true;
-  try {
-    const snap = await db.ref('permissions/' + user.grade + '/' + page).once('value');
-    if (snap.exists()) return snap.val() === true;
-  } catch(e) {}
-  const gradePerms = PERMS_DEFAUT[user.grade] || PERMS_DEFAUT["Comis"];
-  return gradePerms.includes(page);
-}
-
 function getUser() {
   return JSON.parse(sessionStorage.getItem('jimenez_user') || 'null');
 }

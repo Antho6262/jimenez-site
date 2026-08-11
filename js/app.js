@@ -82,7 +82,7 @@ async function buildSidebar(currentPage) {
 
   sidebar.innerHTML = `
     <div class="sidebar-header">
-      <img src="../img/groupe.jpg" class="sidebar-logo" alt="Vizu 6Block's">
+      <div class="sidebar-logo">V6</div>
       <div class="sidebar-title">Vizu<br><span>6Block's</span></div>
     </div>
     <div class="sidebar-user">

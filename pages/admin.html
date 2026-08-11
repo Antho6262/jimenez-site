@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
+  <link rel="icon" type="image/png" href="../img/favicon.png">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Administration — Vizu 6Block's</title>
@@ -275,10 +276,8 @@
 
     const PAGES_DISPO = ['dashboard','tracker','stats','stock','quotas','objectifs','blanchiment','sanctions','admin','profil','tv','transactions','taxes'];
 
-    GRADES_READY.then(() => {
-      GRADES.forEach(g => {
-        document.getElementById('m-grade').innerHTML += `<option value="${g}">${g}</option>`;
-      });
+    GRADES.forEach(g => {
+      document.getElementById('m-grade').innerHTML += `<option value="${g}">${g}</option>`;
     });
 
     function switchTab(tab, el) {

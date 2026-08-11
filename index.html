@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
+  <link rel="icon" type="image/png" href="img/favicon.png">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Vizu 6Block's — Connexion</title>
@@ -18,8 +19,9 @@
       position: fixed;
       inset: 0;
       background:
-        linear-gradient(rgba(22,24,28,0.82), rgba(22,24,28,0.92)),
-        url('img/groupe.jpg') center 25%/cover no-repeat;
+        radial-gradient(ellipse at center, #1c1f24 0%, #16181c 70%),
+        repeating-linear-gradient(45deg, rgba(46,168,255,0.03) 0 2px, transparent 2px 40px),
+        repeating-linear-gradient(-45deg, rgba(255,255,255,0.02) 0 2px, transparent 2px 40px);
     }
     .login-box {
       position: relative;
@@ -29,21 +31,26 @@
       border-radius: 16px;
       padding: 40px;
       width: 380px;
-      box-shadow: 0 8px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,122,26,0.12);
+      box-shadow: 0 8px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(46,168,255,0.08);
     }
     .login-logo {
       text-align: center;
       margin-bottom: 28px;
     }
     .login-logo .monogram {
-      display: inline-block;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       width: 90px;
       height: 90px;
       border-radius: 50%;
-      border: 2px solid #ff7a1a;
-      box-shadow: 0 0 20px rgba(255,122,26,0.35);
-      object-fit: cover;
-      object-position: center 20%;
+      background: #16181c;
+      border: 2px solid #2ea8ff;
+      box-shadow: 0 0 20px rgba(46,168,255,0.35);
+      color: #2ea8ff;
+      font-size: 30px;
+      font-weight: 800;
+      letter-spacing: -1px;
     }
     .login-title {
       text-align: center;
@@ -55,7 +62,7 @@
     .login-subtitle {
       text-align: center;
       font-size: 13px;
-      color: #ff7a1a;
+      color: #2ea8ff;
       margin-bottom: 28px;
     }
     .form-group { margin-bottom: 16px; }
@@ -79,11 +86,11 @@
       outline: none;
       transition: border-color 0.15s;
     }
-    select:focus, input:focus { border-color: #ff7a1a; }
+    select:focus, input:focus { border-color: #2ea8ff; }
     select option { background: #16181c; }
     .btn-login {
       width: 100%;
-      background: #ff7a1a;
+      background: #2ea8ff;
       color: #16181c;
       border: none;
       border-radius: 8px;
@@ -94,7 +101,7 @@
       margin-top: 8px;
       transition: background 0.15s;
     }
-    .btn-login:hover { background: #ffa04d; }
+    .btn-login:hover { background: #57bfff; }
     .error {
       background: #c0392b15;
       border: 1px solid #c0392b40;
@@ -112,7 +119,7 @@
   <div class="login-bg"></div>
   <div class="login-box">
     <div class="login-logo">
-      <img src="img/groupe.jpg" alt="Vizu 6Block's" class="monogram">
+      <div class="monogram">V6</div>
     </div>
     <div class="login-title">Vizu 6Block's</div>
     <div class="login-subtitle">Espace privé — Accès réservé aux membres</div>
